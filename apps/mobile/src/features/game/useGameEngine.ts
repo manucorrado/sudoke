@@ -1,9 +1,11 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
   abandon as engineAbandon,
+  applyAutoFillNotes as engineApplyAutoFillNotes,
   clearCell as engineClearCell,
   createGame,
   placeValue as enginePlaceValue,
+  requestHint as engineRequestHint,
   setNotesMode as engineSetNotesMode,
   toggleNote as engineToggleNote,
   toggleNotesMode as engineToggleNotesMode,
@@ -32,6 +34,10 @@ export interface UseGameEngine {
   undo: () => void;
   abandon: () => void;
   reset: () => void;
+  /** Casual-only: reveal one correct value, locking the cell. No-op in ranked. */
+  requestHint: () => number | null;
+  /** Casual-only: pre-populate every empty cell with legal candidates. */
+  applyAutoFillNotes: () => void;
 }
 
 /**
@@ -110,6 +116,18 @@ export function useGameEngine(initial: UseGameEngineInput): UseGameEngine {
     setSelectedValue(null);
   }, [initial]);
 
+  const requestHint = useCallback((): number | null => {
+    const { state: next, hintIndex } = engineRequestHint(state, { selectedIndex });
+    if (next === state) return null;
+    setState(next);
+    if (hintIndex !== null) setSelectedIndex(hintIndex);
+    return hintIndex;
+  }, [state, selectedIndex]);
+
+  const applyAutoFillNotes = useCallback(() => {
+    setState((prev) => engineApplyAutoFillNotes(prev));
+  }, []);
+
   return useMemo(
     () => ({
       state,
@@ -125,6 +143,8 @@ export function useGameEngine(initial: UseGameEngineInput): UseGameEngine {
       undo,
       abandon,
       reset,
+      requestHint,
+      applyAutoFillNotes,
     }),
     [
       state,
@@ -140,6 +160,8 @@ export function useGameEngine(initial: UseGameEngineInput): UseGameEngine {
       undo,
       abandon,
       reset,
+      requestHint,
+      applyAutoFillNotes,
     ],
   );
 }

@@ -152,6 +152,11 @@ function CellView({
       }`
     : `Row ${row + 1} Column ${col + 1}, empty`;
 
+  // Color-blind-safe cue (PRD §13.4): show an icon in addition to color
+  // so wrong/conflict cells are perceivable without relying on hue.
+  const cue =
+    cell.isWrong ? '✕' : isConflict ? '!' : null;
+
   return (
     <Pressable
       style={cellStyles}
@@ -173,6 +178,14 @@ function CellView({
         </Text>
       ) : cell.notes.length > 0 ? (
         <NotesGrid notes={cell.notes} />
+      ) : null}
+      {cue ? (
+        <Text
+          style={[styles.cellCue, cell.isWrong ? styles.cellCueWrong : styles.cellCueConflict]}
+          accessibilityElementsHidden
+        >
+          {cue}
+        </Text>
       ) : null}
     </Pressable>
   );
@@ -255,4 +268,13 @@ const styles = StyleSheet.create({
     color: colors.noteText,
     lineHeight: 10,
   },
+  cellCue: {
+    position: 'absolute',
+    top: 1,
+    right: 2,
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  cellCueWrong: { color: colors.danger },
+  cellCueConflict: { color: colors.warning },
 });

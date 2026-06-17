@@ -92,6 +92,9 @@ export function GameScreen({ initial, title, onTerminal }: GameScreenProps) {
         onUndo={game.undo}
         canUndo={canUndo && !terminal}
         disabled={terminal}
+        {...(game.state.rules.mode !== 'ranked' && game.state.rules.hintsEnabled
+          ? { onHint: () => game.requestHint() }
+          : {})}
       />
 
       {terminal ? (

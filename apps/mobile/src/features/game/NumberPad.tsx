@@ -17,6 +17,8 @@ interface NumberPadProps {
   readonly onUndo: () => void;
   readonly canUndo: boolean;
   readonly disabled?: boolean;
+  /** Casual-only: show a hint action. Pass `undefined` to hide. */
+  readonly onHint?: () => void;
 }
 
 /**
@@ -35,6 +37,7 @@ export function NumberPad({
   onUndo,
   canUndo,
   disabled = false,
+  onHint,
 }: NumberPadProps) {
   return (
     <View style={styles.container}>
@@ -61,6 +64,15 @@ export function NumberPad({
           disabled={disabled}
           accessibilityLabel={`Toggle notes mode (currently ${notesMode ? 'on' : 'off'})`}
         />
+        {onHint ? (
+          <ActionButton
+            label="Hint"
+            icon="💡"
+            onPress={onHint}
+            disabled={disabled}
+            accessibilityLabel="Reveal a correct value (casual only)"
+          />
+        ) : null}
       </View>
       <View style={styles.numbersRow}>
         {ALL_VALUES.map((value) => {

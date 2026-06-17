@@ -100,7 +100,9 @@ export type GameAction =
   | { readonly type: 'place_value'; readonly index: number; readonly value: CellValue; readonly previous: CellValue | null; readonly previousNotes: readonly CellValue[]; readonly wasCorrect: boolean; readonly autoCleared?: ReadonlyArray<{ readonly index: number; readonly value: CellValue }> }
   | { readonly type: 'toggle_note'; readonly index: number; readonly value: CellValue; readonly added: boolean }
   | { readonly type: 'clear_cell'; readonly index: number; readonly previousValue: CellValue | null; readonly previousNotes: readonly CellValue[] }
-  | { readonly type: 'set_notes'; readonly index: number; readonly previous: readonly CellValue[]; readonly next: readonly CellValue[] };
+  | { readonly type: 'set_notes'; readonly index: number; readonly previous: readonly CellValue[]; readonly next: readonly CellValue[] }
+  | { readonly type: 'auto_fill_notes'; readonly cells: ReadonlyArray<{ readonly index: number; readonly previous: readonly CellValue[]; readonly next: readonly CellValue[] }> }
+  | { readonly type: 'hint'; readonly index: number; readonly value: CellValue; readonly previousNotes: readonly CellValue[] };
 
 export interface PlaceResult {
   readonly state: GameState;

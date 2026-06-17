@@ -1,4 +1,5 @@
 import {
+  applyAutoFillNotes,
   createGame,
   FIXTURE_PUZZLES,
   makeCasualRules,
@@ -123,6 +124,20 @@ export const DEV_SCENARIOS = {
       state = applyCorrects(state, 3);
       state = applyMistakes(state, 1);
       return state;
+    },
+  },
+  casualHinted: {
+    title: 'Casual · auto-fill notes + hints',
+    build: () => {
+      const state = createGame({
+        puzzle: PUZZLE,
+        rules: makeCasualRules({
+          maxMistakes: null,
+          hintsEnabled: true,
+          autoFillNotes: true,
+        }),
+      });
+      return applyAutoFillNotes(state);
     },
   },
 } as const satisfies Record<string, ScenarioBuilder>;
