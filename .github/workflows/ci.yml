@@ -25,6 +25,8 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Lint (mobile, admin, sudoku-core)
+        run: pnpm lint
       - name: Typecheck (mobile, admin, sudoku-core)
         run: pnpm typecheck
       - name: Unit tests (sudoku-core)
@@ -43,10 +45,10 @@ jobs:
         run: |
           python -m venv .venv
           .venv/bin/python -m pip install -U pip
-          .venv/bin/pip install -e ".[dev]" aiosqlite
-      - name: Ruff lint
+          .venv/bin/pip install -e ".[dev]"
+      - name: Ruff lint (real bugs only)
         working-directory: apps/api
-        # Pre-existing lint debt — only fail on errors introduced by this PR.
+        # Pre-existing lint debt elsewhere — fail only on real bugs.
         # Tighten the rule selection once the codebase is cleaned up.
         run: .venv/bin/ruff check src tests --select F,F401,F841,RUF059
       - name: Pytest
