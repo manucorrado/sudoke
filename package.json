@@ -1,0 +1,20 @@
+{
+  "name": "sudoke",
+  "private": true,
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "dev:mobile": "pnpm --filter @sudoke/mobile start",
+    "dev:mobile:web": "pnpm --filter @sudoke/mobile web",
+    "dev:api": "pnpm --filter @sudoke/api dev",
+    "dev:admin": "pnpm --filter @sudoke/admin dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "clean": "turbo run clean"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.0",
+    "typescript": "^5.7.0"
+  }
+}
