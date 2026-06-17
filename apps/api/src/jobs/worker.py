@@ -48,6 +48,16 @@ async def _loop(interval_s: float) -> None:
         await asyncio.sleep(interval_s)
 
 
+async def _run(cmd: str, interval: float) -> None:
+    try:
+        if cmd == "tick":
+            await _tick()
+        elif cmd == "loop":
+            await _loop(interval)
+    finally:
+        await engine.dispose()
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="sudoke-worker")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -55,14 +65,8 @@ def main(argv: list[str] | None = None) -> int:
     loop = sub.add_parser("loop", help="Run pending jobs in a forever loop")
     loop.add_argument("--interval", type=float, default=60.0)
     args = parser.parse_args(argv)
-
-    try:
-        if args.cmd == "tick":
-            asyncio.run(_tick())
-        elif args.cmd == "loop":
-            asyncio.run(_loop(args.interval))
-    finally:
-        asyncio.run(engine.dispose())
+    interval = getattr(args, "interval", 60.0)
+    asyncio.run(_run(args.cmd, interval))
     return 0
 
 
