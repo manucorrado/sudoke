@@ -23,6 +23,7 @@ dev = [
     "httpx",
     "ruff",
     "mypy",
+    "aiosqlite",
 ]
 
 
