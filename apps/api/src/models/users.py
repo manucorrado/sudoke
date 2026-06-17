@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import enum
 import uuid
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.db.base import Base, TimestampMixin, UUIDPrimaryKey
+
+if TYPE_CHECKING:
+    from src.models.guest import GuestSession
 
 
 class UserRole(str, enum.Enum):

@@ -17,14 +17,12 @@ from src.models import (
     AttemptEventType,
     AttemptStatus,
     DailyPuzzle,
-    DailyPuzzleStatus,
     GuestSession,
     Puzzle,
     RankedAttempt,
     RankedAttemptEvent,
     User,
 )
-from src.models.puzzles import PuzzleDifficulty
 from src.schemas.common import AttemptEventCreate, SubmitAttemptRequest
 from src.services.rating import project_for_attempt
 
