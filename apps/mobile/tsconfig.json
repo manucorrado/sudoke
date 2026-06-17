@@ -4,8 +4,11 @@
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
-    }
+      "@/*": ["./src/*"],
+      "react": ["./node_modules/@types/react"],
+      "react/*": ["./node_modules/@types/react/*"]
+    },
+    "types": ["react"]
   },
   "include": ["src/**/*", "*.config.js", "*.config.ts"]
 }
