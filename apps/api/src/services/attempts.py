@@ -26,6 +26,7 @@ from src.models import (
 )
 from src.models.puzzles import PuzzleDifficulty
 from src.schemas.common import AttemptEventCreate, SubmitAttemptRequest
+from src.services.rating import project_for_attempt
 
 
 class AttemptError(Exception):
@@ -279,6 +280,11 @@ async def submit_attempt(
         occurred_at=moment,
     )
     attempt.status = AttemptStatus.provisional_ranked
+
+    if attempt.user_id is not None:
+        await project_for_attempt(
+            session, attempt=attempt, puzzle_difficulty=puzzle.difficulty
+        )
     return attempt
 
 
