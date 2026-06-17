@@ -16,8 +16,8 @@ Audit of the monorepo (`apps/mobile`, `apps/api`, `apps/admin`, `packages/sudoku
 | **0** Scaffolding | **In progress** | ~85% | Monorepo, Docker Compose, 5-tab shell, FastAPI `/api/v1`, Alembic baseline, dev screens at `/dev` |
 | **1** Sudoku Core | **In progress** | ~80% | `sudoku-core` engine + tests, full board UI, ranked rules, dev board states |
 | **2** Auth & Shell | **In progress** | ~45% | Guest sessions + profile API; no Clerk flows, onboarding, or auth gates |
-| **3** Daily Ranked | **In progress** | ~60% | Full attempt lifecycle API + Today tab; no preview UX, event streaming, cron, CI/deploy |
-| **4** Rating & Leaderboards | **Not started** | ~5% | Placeholder tab only; no rating engine or leaderboard APIs |
+| **3** Daily Ranked | **In progress** | ~75% | Full attempt lifecycle API + Today tab + cron worker + CI; no Render deploy yet |
+| **4** Rating & Leaderboards | **In progress** | ~70% | Rating engine, leaderboard + my-result APIs, post-game card, leaderboard tab, tier badges, finalization cron; no friends graph yet (Epic 6) |
 | **5** Puzzle Ops & Admin | **In progress** | ~65% | Import/review/schedule pipeline + admin UI; no playtest UI, cron activation, 90-puzzle inventory |
 | **6** Social & Challenges | **Not started** | ~0% | Placeholder Social tab only |
 | **7** Practice & Archive | **Not started** | ~20% | Local casual fixtures on Play tab only |
@@ -29,11 +29,10 @@ Audit of the monorepo (`apps/mobile`, `apps/api`, `apps/admin`, `packages/sudoku
 
 ### Cross-cutting gaps blocking launch
 
-1. **Cron/worker** — `activate_due_daily_puzzles`, `finalize_due_daily_puzzles`, and attempt timeout helpers exist but have no runner.
-2. **CI & deployment** — No GitHub Actions, Render config, or Playwright suite (scoped to Epic 3/10).
-3. **Clerk auth** — JWT middleware stub on API; `@clerk/clerk-expo` installed but not wired; profile uses manual token paste.
-4. **Rating + leaderboards** — Entire competitive credibility layer (Epic 4) absent.
-5. **Content inventory** — Admin dashboard tracks a ≥90 puzzle goal; no puzzles loaded yet.
+1. **Render deployment** — GitHub Actions CI is live, but no `render.yaml` / staging environment / Render-side cron yet.
+2. **Clerk auth** — JWT middleware stub on API; `@clerk/clerk-expo` installed but not wired; profile uses manual token paste.
+3. **Friends graph** — Leaderboard "Friends" view returns just the caller; full social graph lives in Epic 6.
+4. **Content inventory** — Admin dashboard tracks a ≥90 puzzle goal; no puzzles loaded yet.
 
 ---
 
