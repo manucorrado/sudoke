@@ -12,6 +12,7 @@ dist/
 ios/
 android/
 web-build/
+*.tsbuildinfo
 
 # Environment
 .env

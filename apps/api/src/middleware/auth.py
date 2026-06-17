@@ -1,11 +1,13 @@
 from dataclasses import dataclass
 
 import structlog
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 
 from src.config import settings
+
+DEV_BYPASS_HEADER = "X-Dev-Auth-User"
 
 logger = structlog.get_logger()
 
@@ -55,8 +57,18 @@ async def _decode_token(token: str) -> AuthenticatedUser:
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    dev_user: str | None = Header(default=None, alias=DEV_BYPASS_HEADER),
 ) -> AuthenticatedUser | None:
-    """Extract and decode Bearer token. Returns None if no token provided."""
+    """Extract and decode Bearer token. Returns None if no token provided.
+
+    In development the API also accepts an ``X-Dev-Auth-User`` header
+    which short-circuits JWT decoding. This is used by the admin UI to
+    authenticate without standing up a full Clerk session, and is never
+    honored outside of `ENVIRONMENT=development`.
+    """
+
+    if dev_user and settings.is_development:
+        return AuthenticatedUser(user_id=dev_user)
     if credentials is None:
         return None
     return await _decode_token(credentials.credentials)
