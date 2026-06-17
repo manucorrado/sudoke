@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { sdk } from '@/lib/sdk';
+import { useQuery } from '@tanstack/react-query';
+import { sdk, type RatingDTO } from '@/lib/sdk';
 import { useAuth } from '@/providers/auth';
+import { TierBadge } from '@/features/rating/TierBadge';
 import { colors, fontSize, radius, spacing } from '@/theme/tokens';
 
 /**
@@ -29,6 +31,13 @@ export function ProfileScreen() {
     setUsername(me?.username ?? '');
     setDisplayName(me?.display_name ?? '');
   }, [me]);
+
+  const rating = useQuery<RatingDTO>({
+    queryKey: ['me', 'rating'],
+    queryFn: () => sdk.getMyRating(authCtx),
+    enabled: status === 'authenticated',
+    staleTime: 30_000,
+  });
 
   async function applyBearer() {
     setError(null);
@@ -81,6 +90,24 @@ export function ProfileScreen() {
           </Text>
         ) : null}
       </View>
+
+      {status === 'authenticated' && rating.data ? (
+        <View style={styles.card}>
+          <Text style={styles.cardLabel}>Competitive rating</Text>
+          <View style={styles.ratingRow}>
+            <TierBadge
+              tier={rating.data.tier}
+              rating={rating.data.rating}
+              provisional={rating.data.is_provisional}
+            />
+          </View>
+          {rating.data.is_provisional ? (
+            <Text style={styles.note}>
+              Provisional — {rating.data.provisional_completions}/10 placement puzzles completed.
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
 
       {status !== 'authenticated' ? (
         <View style={styles.section}>
@@ -167,6 +194,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   cardValue: { fontSize: fontSize.lg, fontWeight: '700', color: colors.text, marginTop: 2 },
+  ratingRow: { marginTop: spacing.sm },
   note: { fontSize: fontSize.xs, color: colors.textMuted, marginTop: spacing.sm },
   section: { gap: spacing.sm },
   sectionTitle: {
