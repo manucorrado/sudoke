@@ -63,6 +63,82 @@ export interface MeDTO {
   readonly created_at: string;
 }
 
+export type RatingTier =
+  | 'bronze'
+  | 'silver'
+  | 'gold'
+  | 'platinum'
+  | 'diamond'
+  | 'master';
+
+export interface RatingDTO {
+  readonly rating: number;
+  readonly tier: RatingTier;
+  readonly provisional_completions: number;
+  readonly is_provisional: boolean;
+  readonly calculation_version: string;
+  readonly last_updated_at: string | null;
+}
+
+export interface RatingHistoryEntryDTO {
+  readonly daily_puzzle_id: string;
+  readonly attempt_id: string;
+  readonly kind: 'projected' | 'final';
+  readonly old_rating: number;
+  readonly new_rating: number;
+  readonly delta: number;
+  readonly percentile: number | null;
+  readonly cohort_size: number;
+  readonly was_provisional: boolean;
+  readonly calculation_version: string;
+  readonly applied_at: string;
+}
+
+export interface RatingHistoryDTO {
+  readonly entries: readonly RatingHistoryEntryDTO[];
+}
+
+export type LeaderboardView = 'global' | 'nearby' | 'friends' | 'historical';
+
+export interface LeaderboardRowDTO {
+  readonly rank: number;
+  readonly user_id: string;
+  readonly username: string | null;
+  readonly display_name: string | null;
+  readonly avatar_url: string | null;
+  readonly official_duration_ms: number;
+  readonly mistakes: number;
+  readonly rating: number;
+  readonly rating_delta: number | null;
+  readonly tier: RatingTier;
+  readonly is_me: boolean;
+}
+
+export interface LeaderboardDTO {
+  readonly daily_puzzle_id: string;
+  readonly view: LeaderboardView;
+  readonly cohort_size: number;
+  readonly is_final: boolean;
+  readonly rows: readonly LeaderboardRowDTO[];
+}
+
+export interface MyResultDTO {
+  readonly daily_puzzle_id: string;
+  readonly attempt_id: string;
+  readonly status: AttemptStatus;
+  readonly rank: number | null;
+  readonly cohort_size: number;
+  readonly percentile: number | null;
+  readonly mistakes: number;
+  readonly official_duration_ms: number | null;
+  readonly rating_before: number | null;
+  readonly rating_after: number | null;
+  readonly rating_delta: number | null;
+  readonly was_provisional: boolean;
+  readonly tier: RatingTier | null;
+  readonly is_final: boolean;
+}
+
 export interface AuthContext {
   readonly bearer?: string;
   readonly guestToken?: string;
@@ -121,5 +197,44 @@ export const sdk = {
     ctx: AuthContext,
   ): Promise<MeDTO> {
     return api.patch<MeDTO>('/me/profile', payload, { headers: headersFor(ctx) });
+  },
+
+  async getMyRating(ctx: AuthContext): Promise<RatingDTO> {
+    return api.get<RatingDTO>('/me/rating', { headers: headersFor(ctx) });
+  },
+
+  async getMyRatingHistory(
+    ctx: AuthContext,
+    opts: { limit?: number; kind?: 'projected' | 'final' } = {},
+  ): Promise<RatingHistoryDTO> {
+    const query = new URLSearchParams();
+    if (opts.limit !== undefined) query.set('limit', String(opts.limit));
+    if (opts.kind) query.set('kind', opts.kind);
+    const qs = query.toString();
+    return api.get<RatingHistoryDTO>(
+      `/me/rating/history${qs ? `?${qs}` : ''}`,
+      { headers: headersFor(ctx) },
+    );
+  },
+
+  async getDailyLeaderboard(
+    dailyId: string,
+    ctx: AuthContext,
+    opts: { view?: LeaderboardView; limit?: number } = {},
+  ): Promise<LeaderboardDTO> {
+    const query = new URLSearchParams();
+    if (opts.view) query.set('view', opts.view);
+    if (opts.limit !== undefined) query.set('limit', String(opts.limit));
+    const qs = query.toString();
+    return api.get<LeaderboardDTO>(
+      `/daily/${dailyId}/leaderboard${qs ? `?${qs}` : ''}`,
+      { headers: headersFor(ctx) },
+    );
+  },
+
+  async getMyDailyResult(dailyId: string, ctx: AuthContext): Promise<MyResultDTO> {
+    return api.get<MyResultDTO>(`/daily/${dailyId}/my-result`, {
+      headers: headersFor(ctx),
+    });
   },
 };

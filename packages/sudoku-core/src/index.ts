@@ -64,13 +64,16 @@ export { validatePuzzle } from './validation';
 
 export {
   abandon,
+  applyAutoFillNotes,
   clearCell,
+  computeCandidates,
   countPlaced,
   createGame,
   createInitialGrid,
   highlightPeers,
   isNumberComplete,
   placeValue,
+  requestHint,
   selectors,
   setNotes,
   setNotesMode,
@@ -78,7 +81,7 @@ export {
   toggleNotesMode,
   undo,
 } from './game';
-export type { CreateGameInput } from './game';
+export type { CreateGameInput, HintResult } from './game';
 
 export type { CasualOverrides } from './rules';
 export {

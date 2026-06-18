@@ -1,10 +1,13 @@
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
+  applyAutoFillNotes,
+  createGame,
   FIXTURE_PUZZLES,
   makeCasualRules,
   type CasualOverrides,
   type CreateGameInput,
+  type GameState,
   type PuzzleDifficulty,
 } from '@sudoke/sudoku-core';
 import { GameScreen } from '@/features/game/GameScreen';
@@ -44,6 +47,16 @@ export function PlayScreen() {
     );
   }
 
+  const handleStart = () => {
+    const rules = makeCasualRules(overrides);
+    let seedState: GameState | undefined;
+    if (overrides.autoFillNotes) {
+      seedState = applyAutoFillNotes(createGame({ puzzle, rules }));
+    }
+    const next: CreateGameInput = { puzzle, rules };
+    setActive(seedState ? { ...next, seedState } as CreateGameInput & { seedState: GameState } : next);
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Casual Play</Text>
@@ -81,10 +94,14 @@ export function PlayScreen() {
         />
       </Section>
 
-      <Pressable
-        style={styles.startButton}
-        onPress={() => setActive({ puzzle, rules: makeCasualRules(overrides) })}
-      >
+      <Section title="Hints (casual only)">
+        <Toggle
+          value={overrides.hintsEnabled ?? false}
+          onChange={(v) => setOverrides((prev) => ({ ...prev, hintsEnabled: v }))}
+        />
+      </Section>
+
+      <Pressable style={styles.startButton} onPress={handleStart}>
         <Text style={styles.startButtonText}>Start Game</Text>
       </Pressable>
     </ScrollView>

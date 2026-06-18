@@ -17,6 +17,7 @@ import type {
   PlayerGrid,
   Puzzle,
 } from './types';
+import { ALL_VALUES } from './types';
 
 /**
  * Core gameplay state machine.
@@ -277,7 +278,9 @@ export function abandon(state: GameState): GameState {
 export function undo(state: GameState): GameState {
   if (state.status !== 'in_progress' || state.history.length === 0) return state;
   const last = state.history[state.history.length - 1]!;
+  // §8.9: locked correct entries cannot be undone. Hints are also locked.
   if (last.type === 'place_value' && last.wasCorrect) return state;
+  if (last.type === 'hint') return state;
 
   const newHistory = state.history.slice(0, -1);
   let nextGrid: PlayerGrid = state.grid;
@@ -337,7 +340,17 @@ export function undo(state: GameState): GameState {
       nextGrid = setCell(state.grid, last.index, { ...cell, notes: last.previous });
       break;
     }
+    case 'auto_fill_notes': {
+      for (const entry of last.cells) {
+        const cell = nextGrid[entry.index];
+        if (!cell || cell.value !== null) continue;
+        nextGrid = setCell(nextGrid, entry.index, { ...cell, notes: entry.previous });
+      }
+      break;
+    }
     default:
+      // `hint` is filtered out at the top of `undo`; the discriminated
+      // union only reaches this point for reversible actions.
       assertNever(last);
   }
 
@@ -347,6 +360,137 @@ export function undo(state: GameState): GameState {
     history: newHistory,
     future: [last, ...state.future],
   };
+}
+
+/**
+ * Compute the set of legal candidates for an empty cell (row/col/box clear).
+ *
+ * Returns `null` if the cell is not empty (final value already set).
+ */
+export function computeCandidates(
+  grid: PlayerGrid,
+  index: number,
+): readonly CellValue[] | null {
+  const cell = grid[index];
+  if (!cell || cell.value !== null) return null;
+  const used = new Set<CellValue>();
+  for (const peerIdx of peersForAutoClear(index)) {
+    const peer = grid[peerIdx];
+    if (peer && peer.value !== null && !peer.isWrong) used.add(peer.value);
+  }
+  return ALL_VALUES.filter((v) => !used.has(v));
+}
+
+/**
+ * Casual-only: pre-populate notes in every empty cell with all legal
+ * candidates (PRD §9 Auto-Fill Notes). Overwrites any existing notes.
+ * No-op in ranked mode.
+ */
+export function applyAutoFillNotes(state: GameState): GameState {
+  if (state.status !== 'in_progress') return state;
+  if (state.rules.mode === 'ranked') return state;
+  const cells: { index: number; previous: readonly CellValue[]; next: readonly CellValue[] }[] = [];
+  let nextGrid: PlayerGrid = state.grid;
+  for (let i = 0; i < TOTAL_CELLS; i += 1) {
+    const cell = nextGrid[i];
+    if (!cell || cell.value !== null) continue;
+    const candidates = computeCandidates(nextGrid, i);
+    if (candidates === null) continue;
+    cells.push({ index: i, previous: cell.notes, next: candidates });
+    nextGrid = setCell(nextGrid, i, { ...cell, notes: candidates });
+  }
+  if (cells.length === 0) return state;
+  const action: GameAction = { type: 'auto_fill_notes', cells };
+  return {
+    ...state,
+    grid: nextGrid,
+    history: [...state.history, action],
+    future: [],
+  };
+}
+
+export interface HintResult {
+  readonly state: GameState;
+  readonly hintIndex: number | null;
+  readonly value: CellValue | null;
+}
+
+/**
+ * Casual-only hint (PRD §9): reveal the correct answer in a single empty
+ * cell. The revealed cell becomes locked just like a correct user entry.
+ * No-op when ranked, when the game is over, or when the board is full.
+ *
+ * Strategy:
+ *   1. Use the currently selected cell if it's empty (lets the player
+ *      ask for a hint on the cell they're stuck on).
+ *   2. Otherwise the first empty non-given cell, scanning row-by-row.
+ */
+export function requestHint(
+  state: GameState,
+  options: { readonly selectedIndex?: number | null } = {},
+): HintResult {
+  if (state.status !== 'in_progress' || state.rules.mode === 'ranked') {
+    return { state, hintIndex: null, value: null };
+  }
+  if (!state.rules.hintsEnabled) {
+    return { state, hintIndex: null, value: null };
+  }
+  let target: number | null = null;
+  const preferred = options.selectedIndex;
+  if (preferred !== null && preferred !== undefined) {
+    const cell = state.grid[preferred];
+    if (cell && cell.value === null) target = preferred;
+  }
+  if (target === null) {
+    for (let i = 0; i < TOTAL_CELLS; i += 1) {
+      const cell = state.grid[i];
+      if (cell && !cell.isGiven && cell.value === null) {
+        target = i;
+        break;
+      }
+    }
+  }
+  if (target === null) return { state, hintIndex: null, value: null };
+  const solutionValue = state.puzzle.solution[target];
+  const cell = state.grid[target];
+  if (!cell || solutionValue === undefined) {
+    return { state, hintIndex: null, value: null };
+  }
+  const previousNotes = cell.notes;
+  let nextGrid: PlayerGrid = setCell(state.grid, target, {
+    value: solutionValue,
+    isGiven: false,
+    isLocked: true,
+    isWrong: false,
+    notes: [],
+  });
+  if (state.rules.autoClearNotes) {
+    for (const peerIdx of peersForAutoClear(target)) {
+      const peer = nextGrid[peerIdx];
+      if (!peer || peer.value !== null) continue;
+      if (peer.notes.includes(solutionValue)) {
+        nextGrid = setCell(nextGrid, peerIdx, {
+          ...peer,
+          notes: peer.notes.filter((n) => n !== solutionValue),
+        });
+      }
+    }
+  }
+  const completed = boardIsComplete(nextGrid, state.puzzle.solution);
+  const action: GameAction = {
+    type: 'hint',
+    index: target,
+    value: solutionValue,
+    previousNotes,
+  };
+  const nextState: GameState = {
+    ...state,
+    grid: nextGrid,
+    status: completed ? 'completed' : state.status,
+    history: [...state.history, action],
+    future: [],
+  };
+  return { state: nextState, hintIndex: target, value: solutionValue };
 }
 
 /** Returns the count of placed instances of `value`, used for number-pad complete state. */

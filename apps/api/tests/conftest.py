@@ -9,9 +9,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import AsyncIterator
-from typing import Any
 
-import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import (

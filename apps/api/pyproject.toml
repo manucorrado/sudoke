@@ -23,6 +23,9 @@ dev = [
     "httpx",
     "ruff",
     "mypy",
+    # In-memory SQLite driver used by the test suite (conftest.py).
+    # The production DATABASE_URL points to Postgres + asyncpg.
+    "aiosqlite",
 ]
 
 

@@ -3,7 +3,13 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { colors, fontSize, radius, spacing } from '@/theme/tokens';
 
 interface DevScreen {
-  readonly path: '/dev/board-in-progress' | '/dev/board-mistakes' | '/dev/board-failed' | '/dev/board-completed' | '/dev/casual';
+  readonly path:
+    | '/dev/board-in-progress'
+    | '/dev/board-mistakes'
+    | '/dev/board-failed'
+    | '/dev/board-completed'
+    | '/dev/casual'
+    | '/dev/board-casual-hinted';
   readonly title: string;
   readonly description: string;
 }
@@ -33,6 +39,12 @@ const DEV_SCREENS: readonly DevScreen[] = [
     path: '/dev/casual',
     title: 'Board · Casual unlimited',
     description: 'Casual rules with unlimited mistakes.',
+  },
+  {
+    path: '/dev/board-casual-hinted',
+    title: 'Board · Casual + hints + auto-fill notes',
+    description:
+      'Casual mode with hints enabled and notes pre-populated via Auto-Fill Notes (PRD §9).',
   },
 ];
 

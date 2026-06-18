@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -8,12 +8,18 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
 import { Countdown } from '@/features/daily/Countdown';
 import {
   DailyAttemptScreen,
   DailyPuzzlePreview,
 } from '@/features/daily/DailyAttemptScreen';
+import { PostGameResultCard } from '@/features/daily/PostGameResultCard';
 import { useDailyPuzzle } from '@/features/daily/useDailyPuzzle';
+import {
+  myResultKey,
+  useMyDailyResult,
+} from '@/features/leaderboard/useLeaderboard';
 import { sdk, type AttemptDTO } from '@/lib/sdk';
 import { useAuth } from '@/providers/auth';
 import { colors, fontSize, radius, spacing } from '@/theme/tokens';
@@ -23,10 +29,22 @@ type Phase = 'idle' | 'starting' | 'in_attempt' | 'completed';
 export function TodayScreen() {
   const { ensureGuest, authCtx, status: authStatus, me } = useAuth();
   const daily = useDailyPuzzle();
+  const queryClient = useQueryClient();
   const [phase, setPhase] = useState<Phase>('idle');
   const [attempt, setAttempt] = useState<AttemptDTO | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const myResult = useMyDailyResult(
+    phase === 'completed' ? daily.data?.id : undefined,
+  );
+
+  useEffect(() => {
+    if (phase === 'completed' && daily.data?.id) {
+      // Refresh leaderboard + my-result once the cohort changes.
+      queryClient.invalidateQueries({ queryKey: ['leaderboard', daily.data.id] });
+      queryClient.invalidateQueries({ queryKey: myResultKey(daily.data.id) });
+    }
+  }, [phase, daily.data?.id, queryClient]);
 
   if (daily.isLoading || authStatus === 'loading') {
     return (
@@ -128,20 +146,11 @@ export function TodayScreen() {
       <Countdown endsAt={dailyData.finalize_at} />
 
       {phase === 'completed' && attempt ? (
-        <View style={styles.resultCard}>
-          <Text style={styles.resultTitle}>Result · {attempt.status.replace('_', ' ')}</Text>
-          {attempt.official_duration_ms !== null ? (
-            <Text style={styles.resultLine}>
-              Official time: {Math.round(attempt.official_duration_ms / 1000)} s
-            </Text>
-          ) : null}
-          <Text style={styles.resultLine}>Mistakes: {attempt.mistakes}</Text>
-          {attempt.under_review_reason ? (
-            <Text style={styles.resultUnderReview}>
-              Your result is under review and is not currently eligible for ranking.
-            </Text>
-          ) : null}
-        </View>
+        <PostGameResultCard
+          attempt={attempt}
+          myResult={myResult.data}
+          isLoading={myResult.isLoading}
+        />
       ) : (
         <Pressable onPress={handleStart} disabled={busy} style={styles.cta}>
           <Text style={styles.ctaText}>
@@ -212,15 +221,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.sm,
   },
-  resultCard: {
-    backgroundColor: colors.surface,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    gap: spacing.xs,
-  },
-  resultTitle: { fontSize: fontSize.lg, fontWeight: '700', color: colors.text },
-  resultLine: { fontSize: fontSize.sm, color: colors.text },
-  resultUnderReview: { fontSize: fontSize.sm, color: colors.warning, marginTop: spacing.xs },
 });
 
 export default TodayScreen;

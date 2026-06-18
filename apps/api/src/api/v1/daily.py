@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db.session import get_db
-from src.middleware.principal import Principal, get_principal, require_principal
+from src.middleware.principal import Principal, require_principal
 from src.models import RankedAttempt
 from src.schemas.common import (
     AttemptEventBatch,

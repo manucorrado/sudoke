@@ -170,3 +170,71 @@ class AttemptEventResponse(APIModel):
 class ErrorResponse(BaseModel):
     detail: str
     issues: list[str] | None = None
+
+
+class RatingPublic(APIModel):
+    """Snapshot of a user's current rating (`GET /me/rating`)."""
+
+    rating: int
+    tier: str
+    provisional_completions: int
+    is_provisional: bool
+    calculation_version: str
+    last_updated_at: datetime | None
+
+
+class RatingHistoryEntry(APIModel):
+    daily_puzzle_id: uuid.UUID
+    attempt_id: uuid.UUID
+    kind: str
+    old_rating: int
+    new_rating: int
+    delta: int
+    percentile: float | None
+    cohort_size: int
+    was_provisional: bool
+    calculation_version: str
+    applied_at: datetime
+
+
+class RatingHistoryResponse(BaseModel):
+    entries: list[RatingHistoryEntry]
+
+
+class LeaderboardRowPublic(BaseModel):
+    rank: int
+    user_id: uuid.UUID
+    username: str | None
+    display_name: str | None
+    avatar_url: str | None
+    official_duration_ms: int
+    mistakes: int
+    rating: int
+    rating_delta: int | None
+    tier: str
+    is_me: bool
+
+
+class LeaderboardResponsePublic(BaseModel):
+    daily_puzzle_id: uuid.UUID
+    view: str
+    cohort_size: int
+    is_final: bool
+    rows: list[LeaderboardRowPublic]
+
+
+class MyResultPublic(BaseModel):
+    daily_puzzle_id: uuid.UUID
+    attempt_id: uuid.UUID
+    status: AttemptStatus
+    rank: int | None
+    cohort_size: int
+    percentile: float | None
+    mistakes: int
+    official_duration_ms: int | None
+    rating_before: int | None
+    rating_after: int | None
+    rating_delta: int | None
+    was_provisional: bool
+    tier: str | None
+    is_final: bool

@@ -13,6 +13,7 @@ from src.models.attempts import (
 from src.models.audit import AdminAuditLog
 from src.models.guest import GuestSession
 from src.models.puzzles import DailyPuzzle, DailyPuzzleStatus, Puzzle, PuzzleStatus
+from src.models.rating import DailyResult, RatingHistory, UserRating
 from src.models.users import User, UserRole
 
 __all__ = [
@@ -21,11 +22,14 @@ __all__ = [
     "AttemptStatus",
     "DailyPuzzle",
     "DailyPuzzleStatus",
+    "DailyResult",
     "GuestSession",
     "Puzzle",
     "PuzzleStatus",
     "RankedAttempt",
     "RankedAttemptEvent",
+    "RatingHistory",
     "User",
+    "UserRating",
     "UserRole",
 ]
