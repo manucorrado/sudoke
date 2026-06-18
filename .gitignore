@@ -42,3 +42,14 @@ coverage/
 # Docker
 postgres-data/
 redis-data/
+
+# Local puzzle archives / generated content
+data/raw/*
+data/processed/*
+*.sqlite
+*.db
+*.csv
+*.jsonl
+
+# Local env
+.env
