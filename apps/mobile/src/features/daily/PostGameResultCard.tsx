@@ -25,6 +25,13 @@ interface PostGameResultCardProps {
   readonly myResult: MyResultDTO | null | undefined;
   readonly isLoading: boolean;
   readonly onShareChallenge?: () => void;
+  readonly isGuest?: boolean;
+  /**
+   * Opens the sign-in flow. When provided alongside `isGuest`, the card
+   * surfaces a "Sign in to save & be ranked" CTA so guests have a clear
+   * path to a permanent rating (PRD §4.2, §5).
+   */
+  readonly onSignIn?: () => void;
 }
 
 function formatDuration(ms: number): string {
@@ -49,6 +56,8 @@ export function PostGameResultCard({
   myResult,
   isLoading,
   onShareChallenge,
+  isGuest = false,
+  onSignIn,
 }: PostGameResultCardProps) {
   const router = useRouter();
   const isUnderReview = attempt.status === 'under_review';
@@ -91,7 +100,24 @@ export function PostGameResultCard({
 
       {isLoading ? <ActivityIndicator color={colors.primary} /> : null}
 
-      {!isUnderReview && myResult ? (
+      {isGuest && onSignIn ? (
+        <Pressable
+          style={styles.guestCta}
+          onPress={onSignIn}
+          accessibilityRole="button"
+          accessibilityLabel="Sign in to save and rank this result"
+        >
+          <View style={styles.guestCtaTextWrap}>
+            <Text style={styles.guestCtaTitle}>Sign in to save & be ranked</Text>
+            <Text style={styles.guestCtaSubtitle}>
+              Guest results are not on the leaderboard. Create an account to claim this time.
+            </Text>
+          </View>
+          <Text style={styles.guestCtaChevron}>→</Text>
+        </Pressable>
+      ) : null}
+
+      {!isUnderReview && !isGuest && myResult ? (
         <View style={styles.ratingBlock}>
           <Text style={styles.ratingLabel}>
             {myResult.is_final ? 'Final rating impact' : 'Projected rating impact'}
@@ -202,4 +228,17 @@ const styles = StyleSheet.create({
   ctaSecondary: { backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.border },
   ctaPrimaryText: { color: colors.textInverse, fontWeight: '700', fontSize: fontSize.md },
   ctaSecondaryText: { color: colors.text, fontWeight: '700', fontSize: fontSize.md },
+  guestCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.primaryMuted,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginTop: spacing.sm,
+  },
+  guestCtaTextWrap: { flex: 1, gap: 2 },
+  guestCtaTitle: { fontSize: fontSize.md, fontWeight: '700', color: colors.text },
+  guestCtaSubtitle: { fontSize: fontSize.xs, color: colors.textMuted, lineHeight: 16 },
+  guestCtaChevron: { fontSize: fontSize.lg, fontWeight: '700', color: colors.primary },
 });

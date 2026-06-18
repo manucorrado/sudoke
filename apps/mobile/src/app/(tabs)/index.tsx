@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { Countdown } from '@/features/daily/Countdown';
 import {
@@ -28,6 +29,8 @@ type Phase = 'idle' | 'starting' | 'in_attempt' | 'completed';
 
 export function TodayScreen() {
   const { ensureGuest, authCtx, status: authStatus, me } = useAuth();
+  const router = useRouter();
+  const isGuest = me?.is_guest !== false;
   const daily = useDailyPuzzle();
   const queryClient = useQueryClient();
   const [phase, setPhase] = useState<Phase>('idle');
@@ -148,23 +151,36 @@ export function TodayScreen() {
       {phase === 'completed' && attempt ? (
         <PostGameResultCard
           attempt={attempt}
-          myResult={myResult.data}
+          myResult={myResult.data ?? null}
           isLoading={myResult.isLoading}
+          isGuest={isGuest}
+          {...(isGuest ? { onSignIn: () => router.push('/sign-in') } : {})}
         />
       ) : (
         <Pressable onPress={handleStart} disabled={busy} style={styles.cta}>
           <Text style={styles.ctaText}>
-            {busy ? 'Starting…' : me?.is_guest === false ? 'Start ranked attempt' : 'Play (Guest)'}
+            {busy ? 'Starting…' : isGuest ? 'Play (Guest)' : 'Start ranked attempt'}
           </Text>
         </Pressable>
       )}
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      {me?.is_guest !== false ? (
-        <Text style={styles.guestNote}>
-          Guests can play, but rating-eligible results require an account.
-        </Text>
+      {isGuest && phase !== 'completed' ? (
+        <Pressable
+          onPress={() => router.push('/sign-in')}
+          style={styles.guestBanner}
+          accessibilityRole="button"
+          accessibilityLabel="Sign in to be ranked"
+        >
+          <View style={styles.guestBannerTextWrap}>
+            <Text style={styles.guestBannerTitle}>Sign in to be ranked</Text>
+            <Text style={styles.guestBannerSubtitle}>
+              Guests can play. Rating, leaderboards, and streaks need an account.
+            </Text>
+          </View>
+          <Text style={styles.guestBannerChevron}>→</Text>
+        </Pressable>
       ) : null}
     </ScrollView>
   );
@@ -215,12 +231,19 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
     borderRadius: radius.md,
   },
-  guestNote: {
-    fontSize: fontSize.xs,
-    color: colors.textMuted,
-    textAlign: 'center',
+  guestBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.primaryMuted,
+    borderRadius: radius.md,
+    padding: spacing.md,
     marginTop: spacing.sm,
   },
+  guestBannerTextWrap: { flex: 1, gap: 2 },
+  guestBannerTitle: { fontSize: fontSize.md, fontWeight: '700', color: colors.text },
+  guestBannerSubtitle: { fontSize: fontSize.xs, color: colors.textMuted, lineHeight: 16 },
+  guestBannerChevron: { fontSize: fontSize.lg, fontWeight: '700', color: colors.primary },
 });
 
 export default TodayScreen;

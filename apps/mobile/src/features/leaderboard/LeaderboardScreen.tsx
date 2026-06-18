@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import type { LeaderboardRowDTO, LeaderboardView } from '@/lib/sdk';
 import { useAuth } from '@/providers/auth';
 import { useDailyPuzzle } from '@/features/daily/useDailyPuzzle';
@@ -62,6 +63,7 @@ function LeaderboardRow({ row }: { readonly row: LeaderboardRowDTO }) {
 
 export function LeaderboardScreen() {
   const { status: authStatus } = useAuth();
+  const router = useRouter();
   const daily = useDailyPuzzle();
   const [view, setView] = useState<LeaderboardView>('global');
   const dailyId = daily.data?.id;
@@ -159,9 +161,20 @@ export function LeaderboardScreen() {
       </View>
 
       {isGuest ? (
-        <Text style={styles.guestNote}>
-          Sign in to see your nearby rank, friends, and rating delta.
-        </Text>
+        <Pressable
+          onPress={() => router.push('/sign-in')}
+          style={styles.guestCta}
+          accessibilityRole="button"
+          accessibilityLabel="Sign in to see nearby rank, friends, and rating delta"
+        >
+          <View style={styles.guestCtaTextWrap}>
+            <Text style={styles.guestCtaTitle}>Sign in to be ranked</Text>
+            <Text style={styles.guestCtaSubtitle}>
+              Unlock your nearby rank, friends view, and rating delta.
+            </Text>
+          </View>
+          <Text style={styles.guestCtaChevron}>→</Text>
+        </Pressable>
       ) : null}
     </ScrollView>
   );
@@ -219,7 +232,19 @@ const styles = StyleSheet.create({
   deltaDown: { color: colors.danger },
   error: { color: colors.danger, fontSize: fontSize.sm },
   empty: { color: colors.textMuted, fontSize: fontSize.sm, fontStyle: 'italic' },
-  guestNote: { fontSize: fontSize.xs, color: colors.textMuted, textAlign: 'center' },
+  guestCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.primaryMuted,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginTop: spacing.sm,
+  },
+  guestCtaTextWrap: { flex: 1, gap: 2 },
+  guestCtaTitle: { fontSize: fontSize.md, fontWeight: '700', color: colors.text },
+  guestCtaSubtitle: { fontSize: fontSize.xs, color: colors.textMuted, lineHeight: 16 },
+  guestCtaChevron: { fontSize: fontSize.lg, fontWeight: '700', color: colors.primary },
 });
 
 export default LeaderboardScreen;

@@ -1,7 +1,7 @@
 # Competitive Social Sudoku — Epic Plan (Updated)
 
 **Source:** `MVP_EPIC_PLAN.md` (v0.2)  
-**Updated:** 2026-06-17 — reconciled against current repository state  
+**Updated:** 2026-06-18 — reconciled against current repository state  
 **Purpose:** Single execution roadmap organized into main EPICs for agentic and team development.  
 **North-star metric:** Weekly active users who complete at least one ranked puzzle and/or challenge another user.
 
@@ -15,13 +15,13 @@ Audit of the monorepo (`apps/mobile`, `apps/api`, `apps/admin`, `packages/sudoku
 |------|--------|---------|--------------|
 | **0** Scaffolding | **In progress** | ~95% | Monorepo, Docker Compose, 5-tab shell, FastAPI `/api/v1`, Alembic baseline, dev screens at `/dev`, working `pnpm lint`+`pnpm typecheck`+`pnpm test`, `aiosqlite` in dev deps |
 | **1** Sudoku Core | **In progress** | ~95% | `sudoku-core` engine + tests, full board UI, ranked rules, hints + auto-fill notes (PRD §9), color-blind-safe conflict cue (§13), dev board states |
-| **2** Auth & Shell | **In progress** | ~45% | Guest sessions + profile API; no Clerk flows, onboarding, or auth gates |
+| **2** Auth & Shell | **In progress** | ~80% | Guest sessions + profile API + onboarding screen + `/sign-in` route + Clerk-bridge scaffold + auth gating CTAs (Today / Leaderboard / Post-game) + `/c/[code]` deep link stub + Profile settings shell. Real Clerk SDK mount + account deletion remain |
 | **3** Daily Ranked | **In progress** | ~75% | Full attempt lifecycle API + Today tab + cron worker + CI; no Render deploy yet |
 | **4** Rating & Leaderboards | **In progress** | ~70% | Rating engine, leaderboard + my-result APIs, post-game card, leaderboard tab, tier badges, finalization cron; no friends graph yet (Epic 6) |
 | **5** Puzzle Ops & Admin | **In progress** | ~65% | Import/review/schedule pipeline + admin UI; no playtest UI, cron activation, 90-puzzle inventory |
-| **6** Social & Challenges | **Not started** | ~0% | Placeholder Social tab only |
+| **6** Social & Challenges | **Not started** | ~5% | Placeholder Social tab + `/c/[code]` deep-link landing stub (saves invite code for later) |
 | **7** Practice & Archive | **Not started** | ~20% | Local casual fixtures on Play tab only |
-| **8** Streaks & Notifications | **Not started** | ~0% | — |
+| **8** Streaks & Notifications | **Not started** | ~0% | Profile settings shell now lists notification rows as "coming in Epic 8" placeholders |
 | **9** Monetization | **Not started** | ~0% | — |
 | **10** Analytics & Launch | **Not started** | ~10% | API structured logging + optional Sentry only |
 
@@ -30,7 +30,7 @@ Audit of the monorepo (`apps/mobile`, `apps/api`, `apps/admin`, `packages/sudoku
 ### Cross-cutting gaps blocking launch
 
 1. **Render deployment** — GitHub Actions CI is live, but no `render.yaml` / staging environment / Render-side cron yet.
-2. **Clerk auth** — JWT middleware stub on API; `@clerk/clerk-expo` installed but not wired; profile uses manual token paste.
+2. **Clerk auth (final mile)** — JWT middleware stub on API; `clerk-bridge.tsx` ready to mount `<ClerkProvider>` once `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` is provisioned. Sign-in screen falls back to dev bearer paste meanwhile.
 3. **Friends graph** — Leaderboard "Friends" view returns just the caller; full social graph lives in Epic 6.
 4. **Content inventory** — Admin dashboard tracks a ≥90 puzzle goal; no puzzles loaded yet.
 
