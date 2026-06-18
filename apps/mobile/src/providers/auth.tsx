@@ -7,11 +7,11 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { appStorage, secureStorage } from '@/lib/storage';
+import { appStorage, secureStorage, StorageKeys } from '@/lib/storage';
 import { sdk, type AuthContext as SdkAuthContext, type MeDTO } from '@/lib/sdk';
 
-const GUEST_TOKEN_KEY = 'sudoke:guest_token';
-const BEARER_KEY = 'sudoke:auth_token';
+const GUEST_TOKEN_KEY = StorageKeys.guestToken;
+const BEARER_KEY = StorageKeys.bearer;
 
 interface AuthState {
   readonly status: 'loading' | 'guest' | 'authenticated' | 'anonymous';

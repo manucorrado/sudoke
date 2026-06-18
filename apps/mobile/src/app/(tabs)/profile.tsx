@@ -1,26 +1,27 @@
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { sdk, type RatingDTO } from '@/lib/sdk';
 import { useAuth } from '@/providers/auth';
 import { TierBadge } from '@/features/rating/TierBadge';
+import { useOnboarding } from '@/features/onboarding/useOnboarding';
 import { colors, fontSize, radius, spacing } from '@/theme/tokens';
 
 /**
- * Profile tab.
+ * Profile tab — account status, rating, profile edit and settings shell.
  *
- * - Guest: shows the "Create account" CTA + a brief value prop.
- * - Authenticated: shows username, display name, avatar URL editor.
- * - Anonymous (no guest yet): bootstrap a guest session on demand.
- *
- * Real Clerk sign-up / sign-in flows are intentionally stubbed — in
- * production the bearer comes from ClerkProvider's `useAuth().getToken()`
- * call, but the rest of the wiring (bearer storage, /me hydration,
- * profile PATCH) lives here.
+ * Sign-in itself lives on `/sign-in` (PRD §5). The Profile tab points
+ * unauthenticated users to that route and focuses on:
+ *   - account status + rating block (authed)
+ *   - editable username / display name (authed)
+ *   - settings placeholders (notifications, account management)
+ *   - support / legal entry points (Epic 10)
  */
 export function ProfileScreen() {
-  const { me, authCtx, status, ensureGuest, signOut, refreshMe, setBearer } = useAuth();
-  const [bearerInput, setBearerInput] = useState('');
+  const router = useRouter();
+  const { me, authCtx, status, signOut, refreshMe } = useAuth();
+  const { reset: resetOnboarding } = useOnboarding();
   const [username, setUsername] = useState(me?.username ?? '');
   const [displayName, setDisplayName] = useState(me?.display_name ?? '');
   const [pending, setPending] = useState(false);
@@ -38,16 +39,6 @@ export function ProfileScreen() {
     enabled: status === 'authenticated',
     staleTime: 30_000,
   });
-
-  async function applyBearer() {
-    setError(null);
-    setSuccess(null);
-    if (!bearerInput.trim()) return;
-    await setBearer(bearerInput.trim());
-    await refreshMe();
-    setSuccess('Signed in.');
-    setBearerInput('');
-  }
 
   async function save() {
     setError(null);
@@ -84,10 +75,19 @@ export function ProfileScreen() {
               ? 'Playing as Guest'
               : 'No session'}
         </Text>
-        {status === 'guest' || status === 'anonymous' ? (
-          <Text style={styles.note}>
-            Account required for ranked submission, leaderboards, rating, and friends.
-          </Text>
+        {status !== 'authenticated' ? (
+          <>
+            <Text style={styles.note}>
+              Account required for ranked submission, leaderboards, rating, and friends.
+            </Text>
+            <Pressable
+              style={styles.signInButton}
+              onPress={() => router.push('/sign-in')}
+              accessibilityRole="button"
+            >
+              <Text style={styles.signInButtonText}>Sign in or create account</Text>
+            </Pressable>
+          </>
         ) : null}
       </View>
 
@@ -109,38 +109,7 @@ export function ProfileScreen() {
         </View>
       ) : null}
 
-      {status !== 'authenticated' ? (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Sign in</Text>
-          <Text style={styles.note}>
-            Paste a Clerk JWT to sign in. (Real Clerk sign-in flows wire here in
-            Epic 2; the bearer mechanism below works against the API today.)
-          </Text>
-          <TextInput
-            placeholder="paste bearer token"
-            value={bearerInput}
-            onChangeText={setBearerInput}
-            autoCapitalize="none"
-            autoCorrect={false}
-            style={styles.input}
-          />
-          <Pressable style={styles.button} onPress={applyBearer}>
-            <Text style={styles.buttonText}>Use this token</Text>
-          </Pressable>
-          {status === 'anonymous' ? (
-            <Pressable
-              style={[styles.button, styles.buttonSecondary]}
-              onPress={() => {
-                void ensureGuest();
-              }}
-            >
-              <Text style={[styles.buttonText, styles.buttonTextSecondary]}>
-                Continue as guest
-              </Text>
-            </Pressable>
-          ) : null}
-        </View>
-      ) : (
+      {status === 'authenticated' ? (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Profile</Text>
           <Text style={styles.label}>Username</Text>
@@ -151,6 +120,7 @@ export function ProfileScreen() {
             autoCorrect={false}
             maxLength={32}
             style={styles.input}
+            placeholder="username"
           />
           <Text style={styles.label}>Display name</Text>
           <TextInput
@@ -158,6 +128,7 @@ export function ProfileScreen() {
             onChangeText={setDisplayName}
             maxLength={64}
             style={styles.input}
+            placeholder="Display name"
           />
           <Pressable
             style={[styles.button, pending && styles.buttonDisabled]}
@@ -166,11 +137,71 @@ export function ProfileScreen() {
           >
             <Text style={styles.buttonText}>{pending ? 'Saving…' : 'Save'}</Text>
           </Pressable>
-          <Pressable style={[styles.button, styles.buttonSecondary]} onPress={() => signOut()}>
-            <Text style={[styles.buttonText, styles.buttonTextSecondary]}>Sign out</Text>
-          </Pressable>
         </View>
-      )}
+      ) : null}
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Notifications</Text>
+        <Pressable style={styles.settingsRow} disabled accessibilityRole="button">
+          <Text style={styles.settingsRowTitle}>Daily reminder</Text>
+          <Text style={styles.settingsRowValueMuted}>Coming in Epic 8</Text>
+        </Pressable>
+        <Pressable style={styles.settingsRow} disabled accessibilityRole="button">
+          <Text style={styles.settingsRowTitle}>Friend challenges</Text>
+          <Text style={styles.settingsRowValueMuted}>Coming in Epic 8</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>About</Text>
+        <Pressable
+          style={styles.settingsRow}
+          onPress={() => Linking.openURL('https://example.com/privacy')}
+          accessibilityRole="link"
+        >
+          <Text style={styles.settingsRowTitle}>Privacy policy</Text>
+          <Text style={styles.settingsRowValue}>→</Text>
+        </Pressable>
+        <Pressable
+          style={styles.settingsRow}
+          onPress={() => Linking.openURL('https://example.com/terms')}
+          accessibilityRole="link"
+        >
+          <Text style={styles.settingsRowTitle}>Terms of service</Text>
+          <Text style={styles.settingsRowValue}>→</Text>
+        </Pressable>
+        <Pressable
+          style={styles.settingsRow}
+          onPress={() => Linking.openURL('mailto:support@sudoke.app')}
+          accessibilityRole="link"
+        >
+          <Text style={styles.settingsRowTitle}>Support</Text>
+          <Text style={styles.settingsRowValue}>→</Text>
+        </Pressable>
+      </View>
+
+      {status === 'authenticated' ? (
+        <Pressable
+          style={[styles.button, styles.buttonSecondary]}
+          onPress={() => signOut()}
+          accessibilityRole="button"
+        >
+          <Text style={[styles.buttonText, styles.buttonTextSecondary]}>Sign out</Text>
+        </Pressable>
+      ) : null}
+
+      {__DEV__ ? (
+        <Pressable
+          style={[styles.button, styles.buttonGhost]}
+          onPress={() => {
+            void resetOnboarding();
+            router.replace('/onboarding');
+          }}
+          accessibilityRole="button"
+        >
+          <Text style={styles.buttonGhostText}>Replay onboarding (dev)</Text>
+        </Pressable>
+      ) : null}
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {success ? <Text style={styles.success}>{success}</Text> : null}
@@ -195,13 +226,23 @@ const styles = StyleSheet.create({
   },
   cardValue: { fontSize: fontSize.lg, fontWeight: '700', color: colors.text, marginTop: 2 },
   ratingRow: { marginTop: spacing.sm },
-  note: { fontSize: fontSize.xs, color: colors.textMuted, marginTop: spacing.sm },
+  note: { fontSize: fontSize.xs, color: colors.textMuted, marginTop: spacing.sm, lineHeight: 16 },
+  signInButton: {
+    marginTop: spacing.sm,
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    alignItems: 'center',
+  },
+  signInButtonText: { color: colors.textInverse, fontWeight: '700' },
   section: { gap: spacing.sm },
   sectionTitle: {
-    fontSize: fontSize.sm,
+    fontSize: fontSize.xs,
     fontWeight: '600',
     color: colors.textMuted,
     textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   label: { fontSize: fontSize.xs, color: colors.textMuted },
   input: {
@@ -221,9 +262,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   buttonSecondary: { backgroundColor: colors.surface },
+  buttonGhost: { backgroundColor: 'transparent' },
   buttonDisabled: { opacity: 0.5 },
   buttonText: { color: colors.textInverse, fontWeight: '700' },
   buttonTextSecondary: { color: colors.text },
+  buttonGhostText: { color: colors.primary, fontWeight: '600' },
+  settingsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+  },
+  settingsRowTitle: { fontSize: fontSize.md, color: colors.text, fontWeight: '600' },
+  settingsRowValue: { fontSize: fontSize.md, color: colors.primary, fontWeight: '700' },
+  settingsRowValueMuted: { fontSize: fontSize.xs, color: colors.textMuted },
   error: {
     backgroundColor: colors.dangerMuted,
     color: colors.danger,
