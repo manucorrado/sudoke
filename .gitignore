@@ -45,6 +45,10 @@ redis-data/
 
 # Local puzzle archives / generated content
 data/raw/*
+!data/raw/sudoku_exchange/
+data/raw/sudoku_exchange/*
+!data/raw/sudoku_exchange/easy.txt
+
 data/processed/*
 *.sqlite
 *.db
