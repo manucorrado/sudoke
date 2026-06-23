@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { AppShell } from '@/components/AppShell';
+import { PlaytestForm } from '@/components/PlaytestForm';
 import { ReviewActions } from '@/components/ReviewActions';
 import { PuzzlePreviewGrid } from '@/components/PuzzlePreviewGrid';
 import { apiFetch, ApiError } from '@/lib/api';
@@ -65,6 +66,12 @@ export default async function PuzzleDetail({ params }: PuzzleDetailProps) {
           </dl>
           <h2 className={styles.sectionTitle} style={{ marginTop: 24 }}>Actions</h2>
           <ReviewActions puzzleId={puzzle.id} status={puzzle.status} />
+          <h2 className={styles.sectionTitle} style={{ marginTop: 24 }}>Playtest</h2>
+          <p className={styles.muted} style={{ marginBottom: 8 }}>
+            Record a manual solve. Saved to the admin audit log so reviewers can
+            see how long the puzzle actually takes.
+          </p>
+          <PlaytestForm puzzleId={puzzle.id} />
         </aside>
       </div>
     </AppShell>
