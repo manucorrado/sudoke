@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     API_V1_PREFIX: str = "/api/v1"
 
+    # Base URL for human-readable challenge share links. The mobile app
+    # also handles `sudoke://c/{code}` deep links — see /c/[code].
+    CHALLENGE_SHARE_BASE_URL: str = "https://sudoke.app/c"
+
     @property
     def is_development(self) -> bool:
         return self.ENVIRONMENT == "development"

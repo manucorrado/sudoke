@@ -238,3 +238,171 @@ class MyResultPublic(BaseModel):
     was_provisional: bool
     tier: str | None
     is_final: bool
+
+
+class StreakPublic(APIModel):
+    current_length: int
+    longest_length: int
+    freezes_held: int
+    max_freezes: int
+    completions_total: int
+    last_completed_date: date | None
+    streak_started_date: date | None
+
+
+class NotificationPreferencesPublic(APIModel):
+    daily_reminder: bool
+    friend_challenged_you: bool
+    beat_your_time: bool
+    final_ranking_ready: bool
+
+
+class UpdateNotificationPreferencesRequest(BaseModel):
+    daily_reminder: bool | None = None
+    friend_challenged_you: bool | None = None
+    beat_your_time: bool | None = None
+    final_ranking_ready: bool | None = None
+
+
+# ---- Epic 7 — Archive / practice ----------------------------------------
+
+
+class ArchiveEntryPublic(APIModel):
+    daily_puzzle_id: uuid.UUID
+    puzzle_id: uuid.UUID
+    scheduled_for: date
+    difficulty: PuzzleDifficulty
+    estimated_min_seconds: int
+    estimated_max_seconds: int
+    is_final: bool
+
+
+class ArchiveListPublic(BaseModel):
+    entries: list[ArchiveEntryPublic]
+
+
+class ArchiveDetailPublic(APIModel):
+    daily_puzzle_id: uuid.UUID
+    puzzle_id: uuid.UUID
+    scheduled_for: date
+    difficulty: PuzzleDifficulty
+    estimated_min_seconds: int
+    estimated_max_seconds: int
+    givens: str
+    solution: str
+    is_final: bool
+
+
+class UpcomingEntryPublic(APIModel):
+    scheduled_for: date
+    difficulty: PuzzleDifficulty
+
+
+class UpcomingListPublic(BaseModel):
+    entries: list[UpcomingEntryPublic]
+
+
+class GhostRankRequest(BaseModel):
+    duration_ms: int = Field(ge=0)
+    mistakes: int = Field(ge=0, le=3)
+
+
+class GhostRankPublic(BaseModel):
+    daily_puzzle_id: uuid.UUID
+    duration_ms: int
+    mistakes: int
+    ghost_rank: int | None
+    cohort_size: int
+    percentile: float | None
+    is_official: bool = False
+
+
+# ---- Epic 6 — Social & Challenges ---------------------------------------
+
+
+class UserSearchResultPublic(APIModel):
+    id: uuid.UUID
+    username: str | None
+    display_name: str | None
+    avatar_url: str | None
+    relationship: str  # "self" | "friends" | "request_sent" | "request_received" | "none"
+
+
+class UserSearchResponsePublic(BaseModel):
+    results: list[UserSearchResultPublic]
+
+
+class FriendPublic(APIModel):
+    user_id: uuid.UUID
+    username: str | None
+    display_name: str | None
+    avatar_url: str | None
+    friend_since: datetime
+
+
+class FriendsListPublic(BaseModel):
+    friends: list[FriendPublic]
+
+
+class FriendRequestPublic(APIModel):
+    id: uuid.UUID
+    from_user_id: uuid.UUID
+    to_user_id: uuid.UUID
+    from_username: str | None
+    from_display_name: str | None
+    to_username: str | None
+    to_display_name: str | None
+    status: str
+    created_at: datetime
+    responded_at: datetime | None
+
+
+class FriendRequestListPublic(BaseModel):
+    incoming: list[FriendRequestPublic]
+    outgoing: list[FriendRequestPublic]
+
+
+class CreateFriendRequestBody(BaseModel):
+    username: str = Field(min_length=1, max_length=32)
+
+
+class ChallengeCreateRequest(BaseModel):
+    daily_puzzle_id: uuid.UUID | None = None
+
+
+class ChallengePublic(APIModel):
+    id: uuid.UUID
+    code: str
+    daily_puzzle_id: uuid.UUID
+    challenger_user_id: uuid.UUID
+    challenger_username: str | None
+    challenger_display_name: str | None
+    challenger_duration_ms: int | None
+    challenger_mistakes: int | None
+    status: str
+    created_at: datetime
+    expires_at: datetime | None
+    share_url: str
+
+
+class ChallengeAcceptancePublic(APIModel):
+    id: uuid.UUID
+    challenge_id: uuid.UUID
+    recipient_user_id: uuid.UUID | None
+    recipient_username: str | None
+    recipient_display_name: str | None
+    duration_ms: int | None
+    mistakes: int | None
+    completed_at: datetime | None
+
+
+class ChallengeDetailPublic(BaseModel):
+    challenge: ChallengePublic
+    acceptances: list[ChallengeAcceptancePublic]
+    daily_difficulty: PuzzleDifficulty
+    daily_scheduled_for: date
+
+
+class MyChallengesPublic(BaseModel):
+    sent: list[ChallengePublic]
+    received: list[ChallengePublic]

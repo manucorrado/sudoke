@@ -25,6 +25,7 @@ from src.models import (
 )
 from src.schemas.common import AttemptEventCreate, SubmitAttemptRequest
 from src.services.rating import project_for_attempt
+from src.services.streaks import record_completion
 
 
 class AttemptError(Exception):
@@ -283,6 +284,12 @@ async def submit_attempt(
         await project_for_attempt(
             session, attempt=attempt, puzzle_difficulty=puzzle.difficulty
         )
+        # Streak credit only on official completions (PRD §18).
+        owner = await session.get(User, attempt.user_id)
+        if owner is not None:
+            await record_completion(
+                session, owner, completed_on=daily.scheduled_for
+            )
     return attempt
 
 
