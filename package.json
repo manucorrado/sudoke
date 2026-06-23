@@ -19,5 +19,11 @@
     "eslint": "^8",
     "turbo": "^2.3.0",
     "typescript": "^5.7.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "@types/react": "~18.3.31",
+      "@types/react-dom": "~18.3.7"
+    }
   }
 }

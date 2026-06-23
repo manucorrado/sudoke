@@ -4,6 +4,10 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  '@types/react': ~18.3.31
+  '@types/react-dom': ~18.3.7
+
 importers:
 
   .:
@@ -37,11 +41,11 @@ importers:
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@types/react':
-        specifier: 19.0.0
-        version: 19.0.0
+        specifier: ~18.3.0
+        version: 18.3.31
       '@types/react-dom':
-        specifier: 19.0.0
-        version: 19.0.0
+        specifier: ~18.3.0
+        version: 18.3.7
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
@@ -2563,6 +2567,9 @@ packages:
 
   '@types/prop-types@15.7.15':
     resolution: {integrity: sha512-F6bEyamV9jKGAFBEmlQnesRPGOQqS2+Uwi0Em15xenOxHaf2hv6L8YCVn3rPdPJOiJfPiCnLIRyvwVaqMY3MIw==}
+
+  '@types/react-dom@18.3.7':
+    resolution: {integrity: sha512-MEe3UeoENYVFXzoXEWsvcpg6ZvlrFNlOQ7EOsvhI3CfAXwzPfO8Qwuxd40nepsYKqyyVQnTdEfv68q91yLcKrQ==}
 
   '@types/react-dom@19.0.0':
     resolution: {integrity: sha512-1KfiQKsH1o00p9m5ag12axHQSb3FOU9H20UTrujVSkNhuCrRHiQWFqgEnTNK5ZNfnzZv8UWrnXVqCmCF9fgY3w==}
@@ -9105,6 +9112,10 @@ snapshots:
   '@types/parse-json@4.0.2': {}
 
   '@types/prop-types@15.7.15': {}
+
+  '@types/react-dom@18.3.7':
+    dependencies:
+      '@types/react': 18.3.31
 
   '@types/react-dom@19.0.0':
     dependencies:
