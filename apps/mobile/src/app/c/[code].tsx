@@ -3,10 +3,10 @@
  *
  * Deep link format: `sudoke://c/{code}` (or `https://sudoke.app/c/{code}`).
  *
- * For now this is a stub: we parse the code, persist it as a pending
- * challenge so Epic 6's accept/claim flow can pick it up after onboarding
- * or sign-in, and show a friendly placeholder. The full challenge
- * comparison UX is delivered as part of Epic 6 (Social & Challenges).
+ * Resolves the challenge against the API, shows the challenger's time,
+ * and lets the recipient either play as guest or sign in first. The
+ * code is also persisted so the post-completion claim flow can attach
+ * the result to the right challenge.
  */
 
 import { useEffect, useState } from 'react';
@@ -14,6 +14,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { appStorage, StorageKeys } from '@/lib/storage';
 import { useAuth } from '@/providers/auth';
+import { useResolveChallenge } from '@/features/social/useSocial';
 import { colors, fontSize, radius, spacing } from '@/theme/tokens';
 
 export function ChallengeLandingScreen() {
@@ -23,6 +24,7 @@ export function ChallengeLandingScreen() {
   const code = typeof rawCode === 'string' ? rawCode.trim() : '';
   const { ensureGuest, status } = useAuth();
   const [busy, setBusy] = useState(false);
+  const challenge = useResolveChallenge(code || null);
 
   useEffect(() => {
     if (!code) return;
@@ -57,10 +59,37 @@ export function ChallengeLandingScreen() {
     <View style={styles.container}>
       <Text style={styles.kicker}>Challenge invite</Text>
       <Text style={styles.title}>You've been challenged!</Text>
-      <Text style={styles.subtitle}>
-        A friend invited you to play today's puzzle. Take the challenge — you'll see how your
-        time compares once you finish.
-      </Text>
+      {challenge.isLoading ? (
+        <ActivityIndicator />
+      ) : challenge.data ? (
+        <View style={styles.detailCard}>
+          <Text style={styles.detailTitle}>
+            {challenge.data.challenge.challenger_display_name ||
+              challenge.data.challenge.challenger_username ||
+              'A friend'}{' '}
+            challenged you
+          </Text>
+          <Text style={styles.subtitle}>
+            {challenge.data.daily_difficulty.toUpperCase()} ·{' '}
+            {challenge.data.daily_scheduled_for}
+          </Text>
+          {challenge.data.challenge.challenger_duration_ms !== null ? (
+            <Text style={styles.detailLine}>
+              Their time: {formatDuration(challenge.data.challenge.challenger_duration_ms)}
+              {challenge.data.challenge.challenger_mistakes !== null
+                ? ` · ${challenge.data.challenge.challenger_mistakes} mistakes`
+                : ''}
+            </Text>
+          ) : (
+            <Text style={styles.detailLine}>They haven't finished yet — beat them to it!</Text>
+          )}
+        </View>
+      ) : (
+        <Text style={styles.subtitle}>
+          We couldn't resolve this challenge right now. We've saved your code so you can pick up
+          where you left off after launching the app.
+        </Text>
+      )}
 
       <View style={styles.codeCard} accessibilityLabel={`Challenge code ${code}`}>
         <Text style={styles.codeLabel}>Challenge code</Text>
@@ -87,11 +116,17 @@ export function ChallengeLandingScreen() {
       </Pressable>
 
       <Text style={styles.note}>
-        Full challenge comparison ships with Epic 6 — your code is saved and will resolve once
-        the social flow is live.
+        Finish today's puzzle and we'll record your result against this challenge automatically.
       </Text>
     </View>
   );
+}
+
+function formatDuration(ms: number): string {
+  const total = Math.round(ms / 1000);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
 }
 
 export default ChallengeLandingScreen;
@@ -108,6 +143,14 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: fontSize.xxl, fontWeight: '800', color: colors.text },
   subtitle: { fontSize: fontSize.md, color: colors.textMuted, lineHeight: 22 },
+  detailCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    gap: 4,
+  },
+  detailTitle: { fontSize: fontSize.lg, fontWeight: '700', color: colors.text },
+  detailLine: { fontSize: fontSize.sm, color: colors.text, marginTop: 4 },
   codeCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,

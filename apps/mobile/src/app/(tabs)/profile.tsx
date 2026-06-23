@@ -1,11 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { sdk, type RatingDTO } from '@/lib/sdk';
 import { useAuth } from '@/providers/auth';
 import { TierBadge } from '@/features/rating/TierBadge';
 import { useOnboarding } from '@/features/onboarding/useOnboarding';
+import {
+  useNotificationPreferences,
+  useStreak,
+  useUpdateNotificationPreferences,
+} from '@/features/streaks/useStreak';
 import { colors, fontSize, radius, spacing } from '@/theme/tokens';
 
 /**
@@ -39,6 +44,9 @@ export function ProfileScreen() {
     enabled: status === 'authenticated',
     staleTime: 30_000,
   });
+  const streak = useStreak();
+  const prefs = useNotificationPreferences();
+  const updatePrefs = useUpdateNotificationPreferences();
 
   async function save() {
     setError(null);
@@ -109,6 +117,41 @@ export function ProfileScreen() {
         </View>
       ) : null}
 
+      {status === 'authenticated' && streak.data ? (
+        <View style={styles.card}>
+          <Text style={styles.cardLabel}>Daily streak</Text>
+          <Text style={styles.streakValue}>
+            {streak.data.current_length} day{streak.data.current_length === 1 ? '' : 's'}
+          </Text>
+          <Text style={styles.note}>
+            Longest streak {streak.data.longest_length} · {streak.data.completions_total} official completions
+          </Text>
+          <View style={styles.freezeRow}>
+            {Array.from({ length: streak.data.max_freezes }).map((_, i) => (
+              <View
+                key={i}
+                style={[
+                  styles.freezeChip,
+                  i < streak.data!.freezes_held && styles.freezeChipHeld,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.freezeChipText,
+                    i < streak.data!.freezes_held && styles.freezeChipTextHeld,
+                  ]}
+                >
+                  ❄ {i < streak.data!.freezes_held ? 'Held' : 'Empty'}
+                </Text>
+              </View>
+            ))}
+          </View>
+          <Text style={styles.note}>
+            Earn one freeze per 7 official completions (max {streak.data.max_freezes}). Freezes auto-consume on a missed day.
+          </Text>
+        </View>
+      ) : null}
+
       {status === 'authenticated' ? (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Profile</Text>
@@ -140,17 +183,39 @@ export function ProfileScreen() {
         </View>
       ) : null}
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Notifications</Text>
-        <Pressable style={styles.settingsRow} disabled accessibilityRole="button">
-          <Text style={styles.settingsRowTitle}>Daily reminder</Text>
-          <Text style={styles.settingsRowValueMuted}>Coming in Epic 8</Text>
-        </Pressable>
-        <Pressable style={styles.settingsRow} disabled accessibilityRole="button">
-          <Text style={styles.settingsRowTitle}>Friend challenges</Text>
-          <Text style={styles.settingsRowValueMuted}>Coming in Epic 8</Text>
-        </Pressable>
-      </View>
+      {status === 'authenticated' ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Notifications</Text>
+          <NotificationToggle
+            label="Daily reminder"
+            value={prefs.data?.daily_reminder ?? true}
+            disabled={prefs.isLoading || updatePrefs.isPending}
+            onChange={(v) => updatePrefs.mutate({ daily_reminder: v })}
+          />
+          <NotificationToggle
+            label="Friend challenged you"
+            value={prefs.data?.friend_challenged_you ?? true}
+            disabled={prefs.isLoading || updatePrefs.isPending}
+            onChange={(v) => updatePrefs.mutate({ friend_challenged_you: v })}
+          />
+          <NotificationToggle
+            label="Someone beat your time"
+            value={prefs.data?.beat_your_time ?? true}
+            disabled={prefs.isLoading || updatePrefs.isPending}
+            onChange={(v) => updatePrefs.mutate({ beat_your_time: v })}
+          />
+          <NotificationToggle
+            label="Final ranking ready"
+            value={prefs.data?.final_ranking_ready ?? true}
+            disabled={prefs.isLoading || updatePrefs.isPending}
+            onChange={(v) => updatePrefs.mutate({ final_ranking_ready: v })}
+          />
+          <Text style={styles.note}>
+            Push delivery requires installing the native notifications module — preferences are saved
+            on the server and respected as soon as it ships.
+          </Text>
+        </View>
+      ) : null}
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>About</Text>
@@ -206,6 +271,27 @@ export function ProfileScreen() {
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {success ? <Text style={styles.success}>{success}</Text> : null}
     </ScrollView>
+  );
+}
+
+interface NotificationToggleProps {
+  readonly label: string;
+  readonly value: boolean;
+  readonly disabled: boolean;
+  readonly onChange: (value: boolean) => void;
+}
+
+function NotificationToggle({ label, value, disabled, onChange }: NotificationToggleProps) {
+  return (
+    <View style={styles.settingsRow}>
+      <Text style={styles.settingsRowTitle}>{label}</Text>
+      <Switch
+        value={value}
+        onValueChange={onChange}
+        disabled={disabled}
+        accessibilityLabel={`${label} notifications`}
+      />
+    </View>
   );
 }
 
@@ -279,6 +365,19 @@ const styles = StyleSheet.create({
   settingsRowTitle: { fontSize: fontSize.md, color: colors.text, fontWeight: '600' },
   settingsRowValue: { fontSize: fontSize.md, color: colors.primary, fontWeight: '700' },
   settingsRowValueMuted: { fontSize: fontSize.xs, color: colors.textMuted },
+  streakValue: { fontSize: fontSize.xxl, fontWeight: '700', color: colors.primary, marginTop: 2 },
+  freezeRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  freezeChip: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.bg,
+  },
+  freezeChipHeld: { backgroundColor: colors.primaryMuted, borderColor: colors.primary },
+  freezeChipText: { fontSize: fontSize.xs, color: colors.textMuted, fontWeight: '600' },
+  freezeChipTextHeld: { color: colors.primary },
   error: {
     backgroundColor: colors.dangerMuted,
     color: colors.danger,

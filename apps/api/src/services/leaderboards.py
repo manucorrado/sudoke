@@ -28,6 +28,7 @@ from src.services.rating import (
     STARTING_RATING,
     tier_for_rating,
 )
+from src.services.social import get_friend_ids
 
 LeaderboardView = Literal["global", "nearby", "friends", "historical"]
 
@@ -236,8 +237,15 @@ async def get_leaderboard(
 
     my_index = _index_of(cohort, me.id if me else None)
     if view == "friends":
-        # Friends graph not yet implemented (Epic 6). Return just the caller.
-        filtered = [(i, a) for i, a in enumerate(cohort) if me and a.user_id == me.id]
+        # Show me + my accepted friends, preserving rank within the cohort.
+        if me is not None:
+            friend_ids = await get_friend_ids(session, me)
+            allowed = friend_ids | {me.id}
+        else:
+            allowed = set()
+        filtered = [
+            (i, a) for i, a in enumerate(cohort) if a.user_id in allowed
+        ]
         slice_view = filtered[:limit]
     else:
         slice_start, slice_end = _slice_for(view, my_index, len(cohort), limit)

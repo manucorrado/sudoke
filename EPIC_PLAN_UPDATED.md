@@ -1,7 +1,7 @@
 # Competitive Social Sudoku — Epic Plan (Updated)
 
 **Source:** `MVP_EPIC_PLAN.md` (v0.2)  
-**Updated:** 2026-06-22 — reconciled against current repository state  
+**Updated:** 2026-06-23 — Epics 6/7/8 first slice landed; infra-free deliverables only  
 **Purpose:** Single execution roadmap organized into main EPICs for agentic and team development.  
 **North-star metric:** Weekly active users who complete at least one ranked puzzle and/or challenge another user.
 
@@ -19,9 +19,9 @@ Audit of the monorepo (`apps/mobile`, `apps/api`, `apps/admin`, `packages/sudoku
 | **3** Daily Ranked | **In progress** | ~75% | Full attempt lifecycle API + Today tab + cron worker + CI; no Render deploy yet |
 | **4** Rating & Leaderboards | **In progress** | ~70% | Rating engine, leaderboard + my-result APIs, post-game card, leaderboard tab, tier badges, finalization cron; no friends graph yet (Epic 6) |
 | **5** Puzzle Ops & Admin | **In progress** | **~90%** | Import/review/schedule pipeline + admin UI **+ end-to-end bank ingestion script** (`apps/api/scripts/ingest_puzzle_bank.py`) **+ admin Playtest UI on puzzle detail page**. Cron activation already wired via `apps/api/src/jobs/tick.py`. Demo: 100 puzzles loaded from Sudoku Exchange CC0 bank and scheduled across 100 consecutive days (1 active, 99 upcoming → exceeds 90-puzzle launch goal). |
-| **6** Social & Challenges | **Not started** | ~5% | Placeholder Social tab + `/c/[code]` deep-link landing stub (saves invite code for later) |
-| **7** Practice & Archive | **Not started** | ~20% | Local casual fixtures on Play tab only |
-| **8** Streaks & Notifications | **Not started** | ~0% | Profile settings shell now lists notification rows as "coming in Epic 8" placeholders |
+| **6** Social & Challenges | **In progress** | **~55%** | Backend friends graph + challenges API (search, request, accept/decline/cancel, friends-filter leaderboard view, challenge create/resolve), full Social tab with three sub-tabs (Friends, Challenges, Find), challenge invite landing screen now resolves codes against the API and displays challenger time. Outstanding: native share/install→play→claim flow, guest claim endpoint, full result comparison after challenge completion. |
+| **7** Practice & Archive | **In progress** | **~75%** | `/archive` + `/archive/upcoming` + `/archive/{id}` + `/archive/{id}/ghost-rank` endpoints, Play tab with three pills (Casual / Archive / Upcoming), archive replay screen running on the real `sudoku-core` engine with end-of-game ghost-rank banner, upcoming-calendar view (difficulty only — no puzzle leak). Outstanding: persisted practice attempts + historical-leaderboard with the user's original result. |
+| **8** Streaks & Notifications | **In progress** | **~70%** | Backend streak tracking with auto-freeze (max 2, +1 per 7 completions, auto-consume on miss), idempotent per (user, day), hooked into `submit_attempt`. `/me/streak` + `/me/notifications/preferences` (GET/PATCH) endpoints. Profile tab shows live streak card with freeze chips and toggle-driven notification preferences. Outstanding: Expo Notifications device registration + delivery (requires native module + APNs/FCM credentials). |
 | **9** Monetization | **Not started** | ~0% | — |
 | **10** Analytics & Launch | **Not started** | ~10% | API structured logging + optional Sentry only |
 
@@ -31,8 +31,10 @@ Audit of the monorepo (`apps/mobile`, `apps/api`, `apps/admin`, `packages/sudoku
 
 1. **Render deployment** — GitHub Actions CI is live, but no `render.yaml` / staging environment / Render-side cron yet.
 2. **Clerk auth (final mile)** — JWT middleware stub on API; `clerk-bridge.tsx` ready to mount `<ClerkProvider>` once `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` is provisioned. Sign-in screen falls back to dev bearer paste meanwhile.
-3. **Friends graph** — Leaderboard "Friends" view returns just the caller; full social graph lives in Epic 6.
+3. ~~**Friends graph** — Leaderboard "Friends" view returns just the caller; full social graph lives in Epic 6.~~ **RESOLVED 2026-06-23.** `friend_requests` table + `/api/v1/me/friends*` + `/users/search` + leaderboard `view=friends` now filters by the accepted friendship graph.
 4. ~~**Content inventory** — Admin dashboard tracks a ≥90 puzzle goal; no puzzles loaded yet.~~ **RESOLVED 2026-06-22.** Ingestion script can be re-run against `data/raw/sudoku_exchange/easy.txt` (100k+ candidate puzzles) at any time. Production deploy still needs the script to be invoked against the Postgres instance.
+5. **Push notifications** — Backend preferences + streak data are live, but Expo Notifications device registration + APNs/FCM key provisioning are infra-side and intentionally deferred (Epic 8 final mile).
+6. **Challenge install→play→claim** — Backend create/resolve/result endpoints + `/c/[code]` landing screen are wired, but the post-completion guest-claim API and the full result comparison after the recipient plays still need to land (Epic 6 final mile).
 
 ---
 
@@ -289,11 +291,12 @@ flowchart TD
 
 ### Exit Criteria
 
-- [ ] User can share challenge link after ranked completion
-- [ ] Guest recipient completes challenge and sees time comparison
-- [ ] Guest can sign up and permanently claim result
-- [ ] Username search and friend requests work end-to-end
-- [ ] Challenge context preserved through install/open deep link path
+- [x] Username search and friend requests work end-to-end — `friend_requests` table + `/users/search` + `/me/friends/requests/{accept,decline,cancel}` (2026-06-23)
+- [x] User can share challenge link after ranked completion — `/me/challenges` create + `share_url` returned, `Share` API wired on Social tab (2026-06-23)
+- [x] Leaderboard `view=friends` filters by the accepted friendship graph (2026-06-23)
+- [x] Challenge context preserved through install/open deep link path — `/c/[code]` resolves the challenge against the API and persists the code in `appStorage` for later claim (2026-06-23)
+- [ ] Guest recipient completes challenge and sees time comparison — challenge `record_acceptance` endpoint exists; wiring it into the Today-tab completion flow + showing the comparison card is the next step
+- [ ] Guest can sign up and permanently claim result — Epic 6 final mile (`POST /me/claim-guest` endpoint not yet implemented)
 
 ---
 
@@ -318,11 +321,12 @@ flowchart TD
 
 ### Exit Criteria
 
-- [ ] Closed daily puzzles appear in archive as practice-only
-- [ ] Archive attempts do not affect rating or historical leaderboard
-- [ ] Ghost rank displays with clear unofficial labeling
-- [ ] Casual mode supports hints and Auto-Fill Notes per §9
-- [ ] Upcoming difficulty visible without exposing puzzle content
+- [x] Closed daily puzzles appear in archive as practice-only — `GET /archive` returns finalized + past-window dailies (2026-06-23)
+- [x] Archive attempts do not affect rating or historical leaderboard — replay runs entirely client-side against `sudoku-core`, no `ranked_attempts` row is created (2026-06-23)
+- [x] Ghost rank displays with clear unofficial labeling — `POST /archive/{id}/ghost-rank` + `<ArchiveReplayCard>` banner with "UNOFFICIAL · GHOST RANK" kicker (2026-06-23)
+- [x] Casual mode supports hints and Auto-Fill Notes per §9 — preserved from Epic 1 on the Play tab "Casual" pill
+- [x] Upcoming difficulty visible without exposing puzzle content — `GET /archive/upcoming` returns only `{scheduled_for, difficulty}` (2026-06-23)
+- [ ] Historical leaderboard read-only with the user's original result if played — leaderboard `view=historical` is already in place, but a per-day archive-attached "your result" lookup still needs to be exposed in the archive UI
 
 ---
 
@@ -348,10 +352,10 @@ flowchart TD
 
 ### Exit Criteria
 
-- [ ] Streak extends only on valid daily ranked completion in window
-- [ ] Freeze auto-consumes on miss; replenishes every 7 completions; capped at 2
-- [ ] Push permission not requested during initial onboarding
-- [ ] All four notification types deliver on device (native QA required)
+- [x] Streak extends only on valid daily ranked completion in window — `record_completion` is invoked from `submit_attempt` *only* when the attempt reaches `provisional_ranked` (i.e. passes mistake + anti-cheat checks). Idempotent per (user, day). (2026-06-23)
+- [x] Freeze auto-consumes on miss; replenishes every 7 completions; capped at 2 — covered by `tests/test_streaks_api.py::test_freeze_*` (2026-06-23)
+- [x] Push permission not requested during initial onboarding — onboarding flow unchanged; preference UI lives behind the Profile auth gate
+- [ ] All four notification types deliver on device (native QA required) — preferences are persisted but Expo Notifications token registration + APNs/FCM credentials are deferred (require infra)
 
 ---
 

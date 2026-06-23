@@ -237,4 +237,339 @@ export const sdk = {
       headers: headersFor(ctx),
     });
   },
+
+  // ---- Epic 7: archive + ghost rank ----
+  async getArchive(
+    ctx: AuthContext,
+    opts: { limit?: number; offset?: number } = {},
+  ): Promise<ArchiveListDTO> {
+    const q = new URLSearchParams();
+    if (opts.limit !== undefined) q.set('limit', String(opts.limit));
+    if (opts.offset !== undefined) q.set('offset', String(opts.offset));
+    const qs = q.toString();
+    return api.get<ArchiveListDTO>(`/archive${qs ? `?${qs}` : ''}`, {
+      headers: headersFor(ctx),
+    });
+  },
+
+  async getArchiveDetail(
+    dailyId: string,
+    ctx: AuthContext,
+  ): Promise<ArchiveDetailDTO> {
+    return api.get<ArchiveDetailDTO>(`/archive/${dailyId}`, {
+      headers: headersFor(ctx),
+    });
+  },
+
+  async getUpcoming(
+    ctx: AuthContext,
+    opts: { limit?: number } = {},
+  ): Promise<UpcomingListDTO> {
+    const q = new URLSearchParams();
+    if (opts.limit !== undefined) q.set('limit', String(opts.limit));
+    const qs = q.toString();
+    return api.get<UpcomingListDTO>(`/archive/upcoming${qs ? `?${qs}` : ''}`, {
+      headers: headersFor(ctx),
+    });
+  },
+
+  async getGhostRank(
+    dailyId: string,
+    payload: { duration_ms: number; mistakes: number },
+    ctx: AuthContext,
+  ): Promise<GhostRankDTO> {
+    return api.post<GhostRankDTO>(`/archive/${dailyId}/ghost-rank`, payload, {
+      headers: headersFor(ctx),
+    });
+  },
+
+  // ---- Epic 8: streak + notification preferences ----
+  async getMyStreak(ctx: AuthContext): Promise<StreakDTO> {
+    return api.get<StreakDTO>('/me/streak', { headers: headersFor(ctx) });
+  },
+
+  async getNotificationPreferences(
+    ctx: AuthContext,
+  ): Promise<NotificationPreferencesDTO> {
+    return api.get<NotificationPreferencesDTO>(
+      '/me/notifications/preferences',
+      { headers: headersFor(ctx) },
+    );
+  },
+
+  async updateNotificationPreferences(
+    payload: Partial<NotificationPreferencesDTO>,
+    ctx: AuthContext,
+  ): Promise<NotificationPreferencesDTO> {
+    return api.patch<NotificationPreferencesDTO>(
+      '/me/notifications/preferences',
+      payload,
+      { headers: headersFor(ctx) },
+    );
+  },
+
+  // ---- Epic 6: friends + challenges ----
+  async listFriends(ctx: AuthContext): Promise<FriendsListDTO> {
+    return api.get<FriendsListDTO>('/me/friends', { headers: headersFor(ctx) });
+  },
+
+  async listFriendRequests(ctx: AuthContext): Promise<FriendRequestListDTO> {
+    return api.get<FriendRequestListDTO>('/me/friends/requests', {
+      headers: headersFor(ctx),
+    });
+  },
+
+  async sendFriendRequest(
+    payload: { username: string },
+    ctx: AuthContext,
+  ): Promise<FriendRequestDTO> {
+    return api.post<FriendRequestDTO>('/me/friends/requests', payload, {
+      headers: headersFor(ctx),
+    });
+  },
+
+  async acceptFriendRequest(
+    requestId: string,
+    ctx: AuthContext,
+  ): Promise<FriendRequestDTO> {
+    return api.post<FriendRequestDTO>(
+      `/me/friends/requests/${requestId}/accept`,
+      undefined,
+      { headers: headersFor(ctx) },
+    );
+  },
+
+  async declineFriendRequest(
+    requestId: string,
+    ctx: AuthContext,
+  ): Promise<FriendRequestDTO> {
+    return api.post<FriendRequestDTO>(
+      `/me/friends/requests/${requestId}/decline`,
+      undefined,
+      { headers: headersFor(ctx) },
+    );
+  },
+
+  async cancelFriendRequest(
+    requestId: string,
+    ctx: AuthContext,
+  ): Promise<FriendRequestDTO> {
+    return api.delete<FriendRequestDTO>(
+      `/me/friends/requests/${requestId}`,
+      { headers: headersFor(ctx) },
+    );
+  },
+
+  async searchUsers(
+    query: string,
+    ctx: AuthContext,
+    opts: { limit?: number } = {},
+  ): Promise<UserSearchResponseDTO> {
+    const q = new URLSearchParams({ q: query });
+    if (opts.limit !== undefined) q.set('limit', String(opts.limit));
+    return api.get<UserSearchResponseDTO>(`/users/search?${q.toString()}`, {
+      headers: headersFor(ctx),
+    });
+  },
+
+  async createChallenge(
+    payload: { daily_puzzle_id?: string } | undefined,
+    ctx: AuthContext,
+  ): Promise<ChallengeDTO> {
+    return api.post<ChallengeDTO>('/me/challenges', payload ?? {}, {
+      headers: headersFor(ctx),
+    });
+  },
+
+  async listMyChallenges(ctx: AuthContext): Promise<MyChallengesDTO> {
+    return api.get<MyChallengesDTO>('/me/challenges', {
+      headers: headersFor(ctx),
+    });
+  },
+
+  async resolveChallengeByCode(
+    code: string,
+    ctx: AuthContext,
+  ): Promise<ChallengeDetailDTO> {
+    return api.get<ChallengeDetailDTO>(`/challenges/by-code/${code}`, {
+      headers: headersFor(ctx),
+    });
+  },
+
+  async getChallenge(
+    challengeId: string,
+    ctx: AuthContext,
+  ): Promise<ChallengeDetailDTO> {
+    return api.get<ChallengeDetailDTO>(`/challenges/${challengeId}`, {
+      headers: headersFor(ctx),
+    });
+  },
+
+  async recordChallengeResult(
+    challengeId: string,
+    ctx: AuthContext,
+  ): Promise<ChallengeAcceptanceDTO> {
+    return api.post<ChallengeAcceptanceDTO>(
+      `/challenges/${challengeId}/results`,
+      undefined,
+      { headers: headersFor(ctx) },
+    );
+  },
 };
+
+// ---- Epic 7 DTOs ----
+
+export type Difficulty = 'easy' | 'medium' | 'hard' | 'expert';
+
+export interface ArchiveEntryDTO {
+  readonly daily_puzzle_id: string;
+  readonly puzzle_id: string;
+  readonly scheduled_for: string;
+  readonly difficulty: Difficulty;
+  readonly estimated_min_seconds: number;
+  readonly estimated_max_seconds: number;
+  readonly is_final: boolean;
+}
+
+export interface ArchiveListDTO {
+  readonly entries: readonly ArchiveEntryDTO[];
+}
+
+export interface ArchiveDetailDTO {
+  readonly daily_puzzle_id: string;
+  readonly puzzle_id: string;
+  readonly scheduled_for: string;
+  readonly difficulty: Difficulty;
+  readonly estimated_min_seconds: number;
+  readonly estimated_max_seconds: number;
+  readonly givens: string;
+  readonly solution: string;
+  readonly is_final: boolean;
+}
+
+export interface UpcomingEntryDTO {
+  readonly scheduled_for: string;
+  readonly difficulty: Difficulty;
+}
+
+export interface UpcomingListDTO {
+  readonly entries: readonly UpcomingEntryDTO[];
+}
+
+export interface GhostRankDTO {
+  readonly daily_puzzle_id: string;
+  readonly duration_ms: number;
+  readonly mistakes: number;
+  readonly ghost_rank: number | null;
+  readonly cohort_size: number;
+  readonly percentile: number | null;
+  readonly is_official: boolean;
+}
+
+// ---- Epic 8 DTOs ----
+
+export interface StreakDTO {
+  readonly current_length: number;
+  readonly longest_length: number;
+  readonly freezes_held: number;
+  readonly max_freezes: number;
+  readonly completions_total: number;
+  readonly last_completed_date: string | null;
+  readonly streak_started_date: string | null;
+}
+
+export interface NotificationPreferencesDTO {
+  readonly daily_reminder: boolean;
+  readonly friend_challenged_you: boolean;
+  readonly beat_your_time: boolean;
+  readonly final_ranking_ready: boolean;
+}
+
+// ---- Epic 6 DTOs ----
+
+export type FriendRelationship =
+  | 'self'
+  | 'friends'
+  | 'request_sent'
+  | 'request_received'
+  | 'none';
+
+export interface UserSearchResultDTO {
+  readonly id: string;
+  readonly username: string | null;
+  readonly display_name: string | null;
+  readonly avatar_url: string | null;
+  readonly relationship: FriendRelationship;
+}
+
+export interface UserSearchResponseDTO {
+  readonly results: readonly UserSearchResultDTO[];
+}
+
+export interface FriendDTO {
+  readonly user_id: string;
+  readonly username: string | null;
+  readonly display_name: string | null;
+  readonly avatar_url: string | null;
+  readonly friend_since: string;
+}
+
+export interface FriendsListDTO {
+  readonly friends: readonly FriendDTO[];
+}
+
+export interface FriendRequestDTO {
+  readonly id: string;
+  readonly from_user_id: string;
+  readonly to_user_id: string;
+  readonly from_username: string | null;
+  readonly from_display_name: string | null;
+  readonly to_username: string | null;
+  readonly to_display_name: string | null;
+  readonly status: string;
+  readonly created_at: string;
+  readonly responded_at: string | null;
+}
+
+export interface FriendRequestListDTO {
+  readonly incoming: readonly FriendRequestDTO[];
+  readonly outgoing: readonly FriendRequestDTO[];
+}
+
+export interface ChallengeDTO {
+  readonly id: string;
+  readonly code: string;
+  readonly daily_puzzle_id: string;
+  readonly challenger_user_id: string;
+  readonly challenger_username: string | null;
+  readonly challenger_display_name: string | null;
+  readonly challenger_duration_ms: number | null;
+  readonly challenger_mistakes: number | null;
+  readonly status: string;
+  readonly created_at: string;
+  readonly expires_at: string | null;
+  readonly share_url: string;
+}
+
+export interface ChallengeAcceptanceDTO {
+  readonly id: string;
+  readonly challenge_id: string;
+  readonly recipient_user_id: string | null;
+  readonly recipient_username: string | null;
+  readonly recipient_display_name: string | null;
+  readonly duration_ms: number | null;
+  readonly mistakes: number | null;
+  readonly completed_at: string | null;
+}
+
+export interface ChallengeDetailDTO {
+  readonly challenge: ChallengeDTO;
+  readonly acceptances: readonly ChallengeAcceptanceDTO[];
+  readonly daily_difficulty: Difficulty;
+  readonly daily_scheduled_for: string;
+}
+
+export interface MyChallengesDTO {
+  readonly sent: readonly ChallengeDTO[];
+  readonly received: readonly ChallengeDTO[];
+}
