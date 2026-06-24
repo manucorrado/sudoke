@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 revision = "0003_social_streaks"
 down_revision = "0002_rating_leaderboards"
@@ -121,7 +122,7 @@ def upgrade() -> None:
         ["user_id"],
     )
 
-    friend_request_status = sa.Enum(
+    friend_request_status = postgresql.ENUM(
         "pending",
         "accepted",
         "declined",
@@ -129,6 +130,14 @@ def upgrade() -> None:
         name="friend_request_status",
     )
     friend_request_status.create(op.get_bind(), checkfirst=True)
+    friend_request_status = postgresql.ENUM(
+        "pending",
+        "accepted",
+        "declined",
+        "cancelled",
+        name="friend_request_status",
+        create_type=False,
+    )
 
     op.create_table(
         "friend_requests",
@@ -185,10 +194,13 @@ def upgrade() -> None:
         ["from_user_id", "status"],
     )
 
-    challenge_status = sa.Enum(
+    challenge_status = postgresql.ENUM(
         "active", "expired", "cancelled", name="challenge_status"
     )
     challenge_status.create(op.get_bind(), checkfirst=True)
+    challenge_status = postgresql.ENUM(
+        "active", "expired", "cancelled", name="challenge_status", create_type=False
+    )
 
     op.create_table(
         "challenges",

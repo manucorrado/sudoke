@@ -19,13 +19,14 @@ async function request<T>(
   options: RequestOptions = {},
 ): Promise<T> {
   const { body, headers, ...rest } = options;
+  const requestBody = body !== undefined ? JSON.stringify(body) : undefined;
 
   const res = await fetch(`${BASE_URL}${path}`, {
     headers: {
       "Content-Type": "application/json",
       ...headers,
     },
-    body: body ? JSON.stringify(body) : undefined,
+    ...(requestBody !== undefined ? { body: requestBody } : {}),
     ...rest,
   });
 

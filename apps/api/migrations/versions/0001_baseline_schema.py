@@ -43,8 +43,11 @@ def upgrade() -> None:
     op.create_unique_constraint("uq_guest_sessions_token", "guest_sessions", ["token"])
     op.create_index("ix_guest_sessions_token", "guest_sessions", ["token"])
 
-    user_role = sa.Enum("player", "admin", name="user_role")
+    user_role = postgresql.ENUM("player", "admin", name="user_role")
     user_role.create(op.get_bind(), checkfirst=True)
+    user_role = postgresql.ENUM(
+        "player", "admin", name="user_role", create_type=False
+    )
 
     op.create_table(
         "users",
@@ -92,11 +95,19 @@ def upgrade() -> None:
         ondelete="SET NULL",
     )
 
-    puzzle_difficulty = sa.Enum(
+    puzzle_difficulty = postgresql.ENUM(
         "easy", "medium", "hard", "expert", name="puzzle_difficulty"
     )
     puzzle_difficulty.create(op.get_bind(), checkfirst=True)
-    puzzle_status = sa.Enum(
+    puzzle_difficulty = postgresql.ENUM(
+        "easy",
+        "medium",
+        "hard",
+        "expert",
+        name="puzzle_difficulty",
+        create_type=False,
+    )
+    puzzle_status = postgresql.ENUM(
         "imported",
         "needs_review",
         "approved",
@@ -105,6 +116,15 @@ def upgrade() -> None:
         name="puzzle_status",
     )
     puzzle_status.create(op.get_bind(), checkfirst=True)
+    puzzle_status = postgresql.ENUM(
+        "imported",
+        "needs_review",
+        "approved",
+        "rejected",
+        "archived",
+        name="puzzle_status",
+        create_type=False,
+    )
 
     op.create_table(
         "puzzles",
@@ -151,7 +171,7 @@ def upgrade() -> None:
         "ix_puzzles_status_difficulty", "puzzles", ["status", "difficulty"]
     )
 
-    daily_puzzle_status = sa.Enum(
+    daily_puzzle_status = postgresql.ENUM(
         "scheduled",
         "active",
         "finalizing",
@@ -160,6 +180,15 @@ def upgrade() -> None:
         name="daily_puzzle_status",
     )
     daily_puzzle_status.create(op.get_bind(), checkfirst=True)
+    daily_puzzle_status = postgresql.ENUM(
+        "scheduled",
+        "active",
+        "finalizing",
+        "finalized",
+        "cancelled",
+        name="daily_puzzle_status",
+        create_type=False,
+    )
 
     op.create_table(
         "daily_puzzles",
@@ -201,7 +230,7 @@ def upgrade() -> None:
         ["status", "scheduled_for"],
     )
 
-    attempt_status = sa.Enum(
+    attempt_status = postgresql.ENUM(
         "not_started",
         "previewing",
         "started",
@@ -218,6 +247,23 @@ def upgrade() -> None:
         name="attempt_status",
     )
     attempt_status.create(op.get_bind(), checkfirst=True)
+    attempt_status = postgresql.ENUM(
+        "not_started",
+        "previewing",
+        "started",
+        "in_progress",
+        "submitted",
+        "validated",
+        "provisional_ranked",
+        "finalized",
+        "abandoned",
+        "timed_out",
+        "invalid",
+        "under_review",
+        "voided",
+        name="attempt_status",
+        create_type=False,
+    )
 
     op.create_table(
         "ranked_attempts",
@@ -282,7 +328,7 @@ def upgrade() -> None:
         ["daily_puzzle_id", "status"],
     )
 
-    attempt_event_type = sa.Enum(
+    attempt_event_type = postgresql.ENUM(
         "preview_started",
         "preview_exited",
         "started",
@@ -299,6 +345,23 @@ def upgrade() -> None:
         name="attempt_event_type",
     )
     attempt_event_type.create(op.get_bind(), checkfirst=True)
+    attempt_event_type = postgresql.ENUM(
+        "preview_started",
+        "preview_exited",
+        "started",
+        "place_value",
+        "toggle_note",
+        "clear_cell",
+        "mistake",
+        "submitted",
+        "validated",
+        "abandoned",
+        "timed_out",
+        "under_review",
+        "finalized",
+        name="attempt_event_type",
+        create_type=False,
+    )
 
     op.create_table(
         "ranked_attempt_events",

@@ -18,6 +18,7 @@ web-build/
 .env
 .env.local
 .env.*.local
+.pnpm-store/
 
 # IDE
 .vscode/
