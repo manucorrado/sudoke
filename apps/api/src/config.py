@@ -43,6 +43,16 @@ class Settings(BaseSettings):
         engine requires ``postgresql+asyncpg://``. Other schemes (sqlite,
         already-qualified asyncpg URLs) are left untouched.
         """
+        import sys
+
+        scheme = value.split("://")[0] if "://" in value else "(no scheme)"
+        print(
+            f"DATABASE_URL diagnostic: scheme={scheme!r}, "
+            f"len={len(value)}, has_at={'@' in value}, "
+            f"first_20={value[:20]!r}",
+            file=sys.stderr,
+        )
+
         if value.startswith("postgres://"):
             return "postgresql+asyncpg://" + value[len("postgres://") :]
         if value.startswith("postgresql://"):
