@@ -1,3 +1,4 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,13 +19,49 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     API_V1_PREFIX: str = "/api/v1"
 
+    # Comma-separated list of browser origins allowed by CORS in non-dev
+    # environments (e.g. the admin dashboard). Native mobile clients are
+    # not CORS-gated. In development all origins are allowed.
+    CORS_ALLOWED_ORIGINS: str = ""
+
+    # Honors the X-Dev-Auth-User bypass header outside of development.
+    # Must remain false in production; may be enabled in staging until
+    # Clerk auth is wired end-to-end.
+    ADMIN_DEV_BYPASS_ENABLED: bool = False
+
     # Base URL for human-readable challenge share links. The mobile app
     # also handles `sudoke://c/{code}` deep links — see /c/[code].
     CHALLENGE_SHARE_BASE_URL: str = "https://sudoke.app/c"
 
+    @field_validator("DATABASE_URL")
+    @classmethod
+    def _normalize_database_url(cls, value: str) -> str:
+        """Coerce managed Postgres URLs to the asyncpg driver.
+
+        Render exposes connection strings as ``postgres://`` or
+        ``postgresql://`` without a driver suffix, but the SQLAlchemy async
+        engine requires ``postgresql+asyncpg://``. Other schemes (sqlite,
+        already-qualified asyncpg URLs) are left untouched.
+        """
+        if value.startswith("postgres://"):
+            return "postgresql+asyncpg://" + value[len("postgres://") :]
+        if value.startswith("postgresql://"):
+            return "postgresql+asyncpg://" + value[len("postgresql://") :]
+        return value
+
     @property
     def is_development(self) -> bool:
         return self.ENVIRONMENT == "development"
+
+    @property
+    def cors_origins(self) -> list[str]:
+        if self.is_development:
+            return ["*"]
+        return [
+            origin.strip()
+            for origin in self.CORS_ALLOWED_ORIGINS.split(",")
+            if origin.strip()
+        ]
 
 
 settings = Settings()
