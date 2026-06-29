@@ -16,7 +16,7 @@ RUN pnpm install --frozen-lockfile
 FROM base AS build
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/admin/node_modules ./apps/admin/node_modules
-COPY tsconfig.base.json ./
+COPY package.json pnpm-workspace.yaml tsconfig.base.json ./
 COPY packages/sudoku-core ./packages/sudoku-core
 COPY apps/admin ./apps/admin
 RUN pnpm --filter @sudoke/admin build
