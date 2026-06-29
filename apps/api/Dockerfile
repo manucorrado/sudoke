@@ -17,6 +17,8 @@ FROM base AS runtime
 COPY --from=deps /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=deps /usr/local/bin /usr/local/bin
 
+# ARG invalidates the layer cache when its value changes across commits.
+ARG BUILD_HASH
 COPY . .
 
 EXPOSE 8000
