@@ -19,12 +19,16 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db.session import get_db
+from src.middleware.principal import require_user
+from src.models import DailyPuzzle, User
 from src.schemas.common import (
     ArchiveDetailPublic,
     ArchiveEntryPublic,
     ArchiveListPublic,
+    ArchiveMyResultPublic,
     GhostRankPublic,
     GhostRankRequest,
+    MyResultPublic,
     UpcomingEntryPublic,
     UpcomingListPublic,
 )
@@ -34,6 +38,7 @@ from src.services.archive import (
     list_archive,
     list_upcoming,
 )
+from src.services.leaderboards import get_my_result
 
 router = APIRouter(prefix="/archive", tags=["archive"])
 
@@ -102,4 +107,53 @@ async def archive_ghost_rank(
         ghost_rank=ghost.ghost_rank,
         cohort_size=ghost.cohort_size,
         percentile=ghost.percentile,
+    )
+
+
+@router.get("/{daily_puzzle_id}/my-result", response_model=ArchiveMyResultPublic)
+async def archive_my_result(
+    daily_puzzle_id: uuid.UUID,
+    user: User = Depends(require_user),
+    session: AsyncSession = Depends(get_db),
+) -> ArchiveMyResultPublic:
+    """Return the caller's original ranked result for a closed daily.
+
+    Unlike `GET /daily/{id}/my-result`, a missing attempt is not a 404 —
+    the archive UI calls this unconditionally and renders the historical
+    board with or without a personal row. Only the daily being open/unknown
+    is a 404.
+    """
+
+    detail = await get_archive_detail(session, daily_puzzle_id)
+    if detail is None:
+        raise HTTPException(
+            status_code=404, detail="Archive puzzle not found or still open"
+        )
+    daily = await session.get(DailyPuzzle, daily_puzzle_id)
+    assert daily is not None  # get_archive_detail guarantees it exists
+    result = await get_my_result(session, daily, user)
+    my_result = (
+        MyResultPublic(
+            daily_puzzle_id=daily.id,
+            attempt_id=result.attempt_id,
+            status=result.status,
+            rank=result.rank,
+            cohort_size=result.cohort_size,
+            percentile=result.percentile,
+            mistakes=result.mistakes,
+            official_duration_ms=result.official_duration_ms,
+            rating_before=result.rating_before,
+            rating_after=result.rating_after,
+            rating_delta=result.rating_delta,
+            was_provisional=result.was_provisional,
+            tier=result.tier,
+            is_final=result.is_final,
+        )
+        if result is not None
+        else None
+    )
+    return ArchiveMyResultPublic(
+        daily_puzzle_id=daily.id,
+        played=my_result is not None,
+        result=my_result,
     )

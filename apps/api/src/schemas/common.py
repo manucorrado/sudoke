@@ -293,6 +293,18 @@ class ArchiveDetailPublic(APIModel):
     is_final: bool
 
 
+class ArchiveMyResultPublic(BaseModel):
+    """The caller's original ranked result for a closed daily (PRD §12).
+
+    `played=False` (and `result=None`) when the caller never made a ranked
+    attempt for this daily — the archive UI shows the historical board only.
+    """
+
+    daily_puzzle_id: uuid.UUID
+    played: bool
+    result: MyResultPublic | None = None
+
+
 class UpcomingEntryPublic(APIModel):
     scheduled_for: date
     difficulty: PuzzleDifficulty

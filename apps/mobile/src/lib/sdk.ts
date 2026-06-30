@@ -294,6 +294,15 @@ export const sdk = {
     });
   },
 
+  async getArchiveMyResult(
+    dailyId: string,
+    ctx: AuthContext,
+  ): Promise<ArchiveMyResultDTO> {
+    return api.get<ArchiveMyResultDTO>(`/archive/${dailyId}/my-result`, {
+      headers: headersFor(ctx),
+    });
+  },
+
   // ---- Epic 8: streak + notification preferences ----
   async getMyStreak(ctx: AuthContext): Promise<StreakDTO> {
     return api.get<StreakDTO>('/me/streak', { headers: headersFor(ctx) });
@@ -475,6 +484,12 @@ export interface GhostRankDTO {
   readonly cohort_size: number;
   readonly percentile: number | null;
   readonly is_official: boolean;
+}
+
+export interface ArchiveMyResultDTO {
+  readonly daily_puzzle_id: string;
+  readonly played: boolean;
+  readonly result: MyResultDTO | null;
 }
 
 // ---- Epic 8 DTOs ----
