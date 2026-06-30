@@ -204,3 +204,47 @@ async def test_schedule_puzzles_skips_taken_dates(
 
     rows_after = await db_session.execute(select(DailyPuzzle))
     assert len(list(rows_after.scalars())) == 3
+
+
+@pytest.mark.asyncio
+async def test_schedule_puzzles_can_follow_weekly_rotation(
+    db_session: AsyncSession,
+) -> None:
+    actor = await ingest.ensure_admin_user(db_session, auth_id="admin-test")
+    await db_session.commit()
+
+    rows = []
+    for line in SAMPLE_LINES[:3]:
+        parsed = ingest.parse_source_line(line)
+        assert parsed is not None
+        src_hash, givens, rating = parsed
+        rows.append(
+            ingest.RawPuzzleRow(
+                source_hash=src_hash,
+                givens=givens,
+                source_rating=rating,
+                source_file="medium.txt",
+                source_line=1,
+            )
+        )
+
+    stats = ingest.IngestStats()
+    inserted = await ingest.import_and_approve(
+        db_session, rows, difficulty="medium", actor=actor, stats=stats
+    )
+    await db_session.commit()
+
+    scheduled = await ingest.schedule_puzzles(
+        db_session,
+        inserted,
+        start_date=date(2026, 6, 22),  # Monday
+        actor=actor,
+        stats=stats,
+        allowed_weekdays=ingest.WEEKLY_ROTATION_WEEKDAYS["medium"],
+    )
+
+    assert [daily.scheduled_for for daily in scheduled] == [
+        date(2026, 6, 24),
+        date(2026, 6, 25),
+        date(2026, 7, 1),
+    ]

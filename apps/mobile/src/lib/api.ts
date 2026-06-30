@@ -1,4 +1,21 @@
-const BASE_URL = "http://localhost:8000/api/v1";
+const LOCAL_API_BASE_URL = 'http://localhost:8000/api/v1';
+
+interface ExpoProcessEnv {
+  readonly EXPO_PUBLIC_API_BASE_URL?: string;
+}
+
+interface GlobalWithProcess {
+  readonly process?: { readonly env?: ExpoProcessEnv };
+}
+
+const env = (globalThis as GlobalWithProcess).process?.env ?? {};
+
+function normalizeBaseUrl(value: string | undefined): string {
+  const baseUrl = value?.trim() || LOCAL_API_BASE_URL;
+  return baseUrl.replace(/\/$/, '');
+}
+
+const BASE_URL = normalizeBaseUrl(env.EXPO_PUBLIC_API_BASE_URL);
 
 interface RequestOptions extends Omit<RequestInit, "body"> {
   body?: unknown;

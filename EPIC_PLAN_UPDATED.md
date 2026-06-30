@@ -1,7 +1,7 @@
 # Competitive Social Sudoku — Epic Plan (Updated)
 
 **Source:** `MVP_EPIC_PLAN.md` (v0.2)  
-**Updated:** 2026-06-23 — Epics 6/7/8 first slice landed; infra-free deliverables only  
+**Updated:** 2026-06-28 — staging deployability, Clerk verification, and content cutover prep added  
 **Purpose:** Single execution roadmap organized into main EPICs for agentic and team development.  
 **North-star metric:** Weekly active users who complete at least one ranked puzzle and/or challenge another user.
 
@@ -15,26 +15,26 @@ Audit of the monorepo (`apps/mobile`, `apps/api`, `apps/admin`, `packages/sudoku
 |------|--------|---------|--------------|
 | **0** Scaffolding | **In progress** | ~95% | Monorepo, Docker Compose, 5-tab shell, FastAPI `/api/v1`, Alembic baseline, dev screens at `/dev`, working `pnpm lint`+`pnpm typecheck`+`pnpm test`, `aiosqlite` in dev deps |
 | **1** Sudoku Core | **In progress** | ~95% | `sudoku-core` engine + tests, full board UI, ranked rules, hints + auto-fill notes (PRD §9), color-blind-safe conflict cue (§13), dev board states |
-| **2** Auth & Shell | **In progress** | ~80% | Guest sessions + profile API + onboarding screen + `/sign-in` route + Clerk-bridge scaffold + auth gating CTAs (Today / Leaderboard / Post-game) + `/c/[code]` deep link stub + Profile settings shell. Real Clerk SDK mount + account deletion remain |
-| **3** Daily Ranked | **In progress** | ~75% | Full attempt lifecycle API + Today tab + cron worker + CI; no Render deploy yet |
+| **2** Auth & Shell | **In progress** | ~90% | Guest sessions + profile API + onboarding screen + `/sign-in` route + ClerkProvider/token bridge when `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` exists + API Clerk JWKS verification in staging/prod + auth gating CTAs (Today / Leaderboard / Post-game) + `/c/[code]` deep link stub + Profile settings shell. Clerk credentials, native OAuth QA, admin Clerk auth, and account deletion remain |
+| **3** Daily Ranked | **In progress** | ~82% | Full attempt lifecycle API + Today tab + cron worker + CI + staging `render.yaml` blueprint/env templates + env-backed production/staging CORS; live Render services/custom domains still not provisioned |
 | **4** Rating & Leaderboards | **In progress** | ~70% | Rating engine, leaderboard + my-result APIs, post-game card, leaderboard tab, tier badges, finalization cron; no friends graph yet (Epic 6) |
-| **5** Puzzle Ops & Admin | **In progress** | **~90%** | Import/review/schedule pipeline + admin UI **+ end-to-end bank ingestion script** (`apps/api/scripts/ingest_puzzle_bank.py`) **+ admin Playtest UI on puzzle detail page**. Cron activation already wired via `apps/api/src/jobs/tick.py`. Demo: 100 puzzles loaded from Sudoku Exchange CC0 bank and scheduled across 100 consecutive days (1 active, 99 upcoming → exceeds 90-puzzle launch goal). |
-| **6** Social & Challenges | **In progress** | **~55%** | Backend friends graph + challenges API (search, request, accept/decline/cancel, friends-filter leaderboard view, challenge create/resolve), full Social tab with three sub-tabs (Friends, Challenges, Find), challenge invite landing screen now resolves codes against the API and displays challenger time. Outstanding: native share/install→play→claim flow, guest claim endpoint, full result comparison after challenge completion. |
+| **5** Puzzle Ops & Admin | **In progress** | **~92%** | Import/review/schedule pipeline + admin UI **+ end-to-end bank ingestion script** (`apps/api/scripts/ingest_puzzle_bank.py`) **+ admin Playtest UI on puzzle detail page** + opt-in weekly rotation scheduling (`--weekly-rotation`) + staging/prod ingestion runbook. Cron activation already wired via `apps/api/src/jobs/tick.py`. Demo: 100 puzzles loaded from Sudoku Exchange CC0 bank and scheduled across 100 consecutive days (1 active, 99 upcoming → exceeds 90-puzzle launch goal). |
+| **6** Social & Challenges | **In progress** | **~85%** | Backend friends graph + challenges API (search, request, accept/decline/cancel, friends-filter leaderboard view, challenge create/resolve/result), full Social tab with three sub-tabs (Friends, Challenges, Find), challenge invite landing with daily guard, Today post-game share CTA, pending challenge result recording, head-to-head comparison UI, and guest result claim after sign-in. Challenge loop + claim code-verified 2026-06-28. Outstanding: analytics hooks/non-playable web landing. |
 | **7** Practice & Archive | **In progress** | **~75%** | `/archive` + `/archive/upcoming` + `/archive/{id}` + `/archive/{id}/ghost-rank` endpoints, Play tab with three pills (Casual / Archive / Upcoming), archive replay screen running on the real `sudoku-core` engine with end-of-game ghost-rank banner, upcoming-calendar view (difficulty only — no puzzle leak). Outstanding: persisted practice attempts + historical-leaderboard with the user's original result. |
 | **8** Streaks & Notifications | **In progress** | **~70%** | Backend streak tracking with auto-freeze (max 2, +1 per 7 completions, auto-consume on miss), idempotent per (user, day), hooked into `submit_attempt`. `/me/streak` + `/me/notifications/preferences` (GET/PATCH) endpoints. Profile tab shows live streak card with freeze chips and toggle-driven notification preferences. Outstanding: Expo Notifications device registration + delivery (requires native module + APNs/FCM credentials). |
 | **9** Monetization | **Not started** | ~0% | — |
-| **10** Analytics & Launch | **Not started** | ~10% | API structured logging + optional Sentry only |
+| **10** Analytics & Launch | **In progress** | ~15% | API structured logging + optional Sentry + repo-side staging blueprint/env runbook. Live Render, credentials, production data load, legal, analytics, and monitoring gates remain |
 
 **No epic is 100% complete.** All epic sections below are kept intact. Completed epics will be collapsed to title-only in future updates once exit criteria pass.
 
 ### Cross-cutting gaps blocking launch
 
-1. **Render deployment** — GitHub Actions CI is live, but no `render.yaml` / staging environment / Render-side cron yet.
-2. **Clerk auth (final mile)** — JWT middleware stub on API; `clerk-bridge.tsx` ready to mount `<ClerkProvider>` once `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` is provisioned. Sign-in screen falls back to dev bearer paste meanwhile.
+1. **Render deployment** — GitHub Actions CI and repo-side staging Blueprint (`render.yaml`) are live, including API, admin, Postgres, Redis, and cron definitions. Actual Render services, custom domains, secrets, and production Blueprint/promotion flow remain manual and were not created.
+2. **Clerk auth (final mile)** — API now verifies Clerk RS256 JWTs via `CLERK_ISSUER` / `CLERK_JWKS_URL` outside development, and mobile mounts ClerkProvider/token bridge when `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` exists. Clerk apps/credentials, native OAuth QA, admin Clerk middleware, webhooks, and account deletion remain manual/open.
 3. ~~**Friends graph** — Leaderboard "Friends" view returns just the caller; full social graph lives in Epic 6.~~ **RESOLVED 2026-06-23.** `friend_requests` table + `/api/v1/me/friends*` + `/users/search` + leaderboard `view=friends` now filters by the accepted friendship graph.
-4. ~~**Content inventory** — Admin dashboard tracks a ≥90 puzzle goal; no puzzles loaded yet.~~ **RESOLVED 2026-06-22.** Ingestion script can be re-run against `data/raw/sudoku_exchange/easy.txt` (100k+ candidate puzzles) at any time. Production deploy still needs the script to be invoked against the Postgres instance.
+4. ~~**Content inventory** — Admin dashboard tracks a ≥90 puzzle goal; no puzzles loaded yet.~~ **RESOLVED 2026-06-22.** Ingestion script can be re-run against `data/raw/sudoku_exchange/easy.txt` (100k+ candidate puzzles) at any time. **UPDATED 2026-06-28:** staging/prod ingestion instructions are documented in `docs/infra/staging.md`, and `--weekly-rotation` supports easy/medium/hard launch calendars. Production deploy still needs the script to be invoked against the production Postgres instance.
 5. **Push notifications** — Backend preferences + streak data are live, but Expo Notifications device registration + APNs/FCM key provisioning are infra-side and intentionally deferred (Epic 8 final mile).
-6. **Challenge install→play→claim** — Backend create/resolve/result endpoints + `/c/[code]` landing screen are wired, but the post-completion guest-claim API and the full result comparison after the recipient plays still need to land (Epic 6 final mile).
+6. **Challenge install→play→claim** — Share/open/play/compare is wired end-to-end and code-verified, including guest result recording, post-game comparison, and guest-to-account result claim after signup. Remaining work is native/manual E2E plus analytics/non-playable web landing.
 
 ---
 
@@ -144,7 +144,7 @@ flowchart TD
 | Area | Scope |
 |------|--------|
 | **Guest sessions** | Anonymous guest ID, local persistence, guest capability restrictions enforced |
-| **Auth flows** | Sign up / log in via Clerk; account required gates (ranked submit, rating, leaderboards, permanent history, official share, friend comparison, claim) |
+| **Auth flows** | Sign up / log in via Clerk; account required gates (ranked submit, rating, leaderboards, permanent history, official share, friend comparison, claim). API verifies Clerk JWKS in staging/prod; mobile mounts ClerkProvider/token bridge when configured; dev bearer fallback remains local-only |
 | **Onboarding** | Guest can play sample/casual puzzle without signup; lightweight value prop before auth prompt |
 | **User profile** | Username, display name, avatar; `GET /me`, `PATCH /me/profile` |
 | **Profile tab** | Settings shell, notification preferences placeholder, account management entry |
@@ -155,7 +155,7 @@ flowchart TD
 - [ ] Guest can open app and play sample puzzle without account
 - [ ] Registered user can create account, set username, view/edit profile
 - [ ] Auth gates block ranked submission and leaderboard visibility for guests
-- [ ] API profile endpoints secured with JWT
+- [ ] API profile endpoints secured with JWT — production/staging verification code is in place, but Clerk credentials and native OAuth QA are still required before marking complete
 
 ---
 
@@ -183,7 +183,7 @@ flowchart TD
 | **Anti-cheat (MVP)** | Conservative absolute solve-time thresholds by difficulty; high-confidence suspicious → under_review, hidden from leaderboard, vague user message |
 | **Background jobs** | Cron: activate daily puzzle, finalize daily cohort |
 | **CI** | Lint, typecheck, unit test runners for mobile, API, and `sudoku-core`; Playwright job against web build |
-| **Deployment** | Render service definitions (API, Postgres, Redis, worker, cron); environment variable templates; staging environment |
+| **Deployment** | Render staging Blueprint as code (`render.yaml`) for API, Postgres, Redis, admin, and cron; environment variable templates for API/admin/mobile; env-backed CORS; cron command documented. Live Render staging/prod service creation remains manual |
 
 ### Exit Criteria
 
@@ -194,7 +194,7 @@ flowchart TD
 - [ ] Suspicious ultra-fast times flagged under_review without revealing rules
 - [ ] Today screen shows difficulty, solve-time estimate, countdown, result card
 - [ ] CI passes on mobile, API, and `sudoku-core`; Playwright captures core ranked flow screenshots
-- [ ] Staging deployment on Render runs daily activation and finalization crons
+- [ ] Staging deployment on Render runs daily activation and finalization crons — repo-side Blueprint + cron command are ready, but live Render services were not created
 
 ---
 
@@ -261,9 +261,10 @@ flowchart TD
 - [x] Expert puzzles excluded from daily ranked rotation — guarded in `schedule_puzzles` and reinforced by `ingest_puzzle_bank.py`'s explicit `easy/medium/hard` rotation
 
 **Operational checklist for the production cutover** (still open):
-- [ ] Run `python -m scripts.ingest_puzzle_bank --source data/raw/sudoku_exchange/easy.txt --limit 120 --schedule --schedule-start <launch-day>` against the production Postgres
-- [ ] Repeat for `medium.txt` / `hard.txt` once those files are uploaded (the script already handles every difficulty band)
-- [ ] Add the weekly difficulty rotation (Mon Easy … Sun Hard) once the medium + hard banks are ingested
+- [ ] Run `python -m scripts.ingest_puzzle_bank --source data/raw/sudoku_exchange/easy.txt --difficulty easy --limit 120 --schedule --weekly-rotation --schedule-start <launch-day>` against the production Postgres
+- [ ] Repeat for `medium.txt` / `hard.txt` once those files are uploaded; use the same `<launch-day>` so the weekly rotation fills Wed/Thu medium and Fri/Sat/Sun hard dates
+- [x] Add weekly difficulty rotation support for content cutover — `--weekly-rotation` schedules easy on Mon/Tue, medium on Wed/Thu, and hard on Fri/Sat/Sun without changing the default consecutive mode
+- [ ] Verify ≥90 approved/scheduled puzzles in the **production** Postgres after ingestion; this was not run during repo-side staging prep
 
 ---
 
@@ -276,13 +277,15 @@ flowchart TD
 
 **Depends on:** Epic 2, Epic 3
 
+**Implementation plan (challenge loop):** [docs/plans/epic-6-challenge-loop.md](docs/plans/epic-6-challenge-loop.md) — implemented 2026-06-26 and code-verified 2026-06-28 for share → open link → play → compare → claim.
+
 ### Deliverables
 
 | Area | Scope |
 |------|--------|
 | **Challenge links** | Create share for daily ranked or archive/casual puzzle; deep link + web landing card (non-playable web) |
 | **Guest challenge flow** | Open link → install/open app → preserve context → play as guest → see comparison vs challenger |
-| **Guest claim** | Post-signup claim of guest result (`POST .../claim`) |
+| **Guest claim** | Post-signup claim of guest result (`POST /me/claim-guest`) |
 | **Daily eligibility** | Active daily challenge recipients rating-eligible if attempt unused and window open |
 | **Friends** | Friends list, username search, friend requests (accept/decline/remove), profile/invite links |
 | **Social tab** | Active/sent/received challenges, friends list, search |
@@ -292,11 +295,12 @@ flowchart TD
 ### Exit Criteria
 
 - [x] Username search and friend requests work end-to-end — `friend_requests` table + `/users/search` + `/me/friends/requests/{accept,decline,cancel}` (2026-06-23)
-- [x] User can share challenge link after ranked completion — `/me/challenges` create + `share_url` returned, `Share` API wired on Social tab (2026-06-23)
+- [x] User can share challenge link after ranked completion — `/me/challenges` create + `share_url` returned, `Share` API wired on Social tab and Today post-game result card (2026-06-26)
 - [x] Leaderboard `view=friends` filters by the accepted friendship graph (2026-06-23)
-- [x] Challenge context preserved through install/open deep link path — `/c/[code]` resolves the challenge against the API and persists the code in `appStorage` for later claim (2026-06-23)
-- [ ] Guest recipient completes challenge and sees time comparison — challenge `record_acceptance` endpoint exists; wiring it into the Today-tab completion flow + showing the comparison card is the next step
-- [ ] Guest can sign up and permanently claim result — Epic 6 final mile (`POST /me/claim-guest` endpoint not yet implemented)
+- [x] Challenge context preserved through install/open deep link path — `/c/[code]` resolves the challenge against the API, persists code + challenge id, and checks daily eligibility before play (2026-06-26)
+- [x] Guest recipient completes challenge and sees time comparison — pending-code consumption, `recordChallengeResult`, comparison card, and guest attempt lookup fix landed (2026-06-26; code-verified 2026-06-28)
+- [x] Post-game “Challenge a friend” share from Today tab after ranked completion — `PostGameResultCard` now receives the Today share handler for registered users (2026-06-26)
+- [x] Guest can sign up and permanently claim result — `POST /me/claim-guest` transfers guest challenge acceptances and non-conflicting ranked attempts; mobile calls it after bearer hydration (2026-06-28)
 
 ---
 
@@ -408,7 +412,7 @@ flowchart TD
 | **Legal** | Privacy Policy, Terms of Service, community/competitive rules, support email |
 | **Privacy** | Account deletion path; anonymized "Deleted Player" on historical leaderboards; GDPR consent; no phone contacts |
 | **Monitoring** | Crash reporting (Sentry), backend logging, daily puzzle job alerts, rating finalization alerts, submission error alerts |
-| **Production** | Render production services, secrets management, cron reliability |
+| **Production** | Render production services, secrets management, cron reliability. Repo-side staging Blueprint/env runbook exists; live Render staging/prod services and production secrets are still manual |
 | **Soft launch** | Real daily schedule, real sharing, analytics dashboards, support flow |
 | **Acceptance audit** | Validate all §34 criteria (gameplay, ranked lifecycle, rating, leaderboards, social, streaks, admin, ads, analytics, legal, monitoring, agent proxies) |
 | **Agent tooling (final)** | Expo Web navigable for all core screens; Storybook/dev screens for all major states; Playwright screenshot suite |
@@ -421,6 +425,14 @@ flowchart TD
 - [ ] Production cron jobs stable for 7+ consecutive days in soft launch
 - [ ] Soft launch metrics tracked: D1/D7 retention, ranked completion rate, share rate, guest conversion (§35)
 - [ ] Native QA sign-off on notifications, AdMob, deep links, backgrounding
+
+### Launch-readiness updates (2026-06-28)
+
+- [x] Repo-side staging deployability prep: `render.yaml`, API/admin/mobile env examples, env-backed CORS, and cron command/runbook added without touching live Render Cloud services
+- [x] Real API auth verification path: staging/production bearer tokens require Clerk RS256 JWKS verification; dev bypass remains development-only
+- [x] Mobile Clerk mount/token bridge: enabled only when `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` exists; guest-first and no-Clerk dev bearer behavior preserved
+- [x] Content cutover prep: staging/prod ingestion instructions documented; weekly rotation scheduling flag added and tested
+- [ ] Manual/open: create Render services, set Clerk/Sentry/PostHog/Expo credentials, configure domains, run staging smoke deploy, run production puzzle ingestion, and complete production data/legal/monitoring launch gates
 
 ---
 
@@ -494,10 +506,10 @@ Per §33, the following are **out of MVP** and must not expand epic scope:
 
 Before public launch, confirm:
 
-1. ≥90 approved puzzles scheduled (Epic 5)
-2. Stable ranked lifecycle and rating jobs for 7+ days (Epic 3, 4)
+1. ≥90 approved puzzles scheduled in production Postgres (Epic 5) — repo-side ingestion/rotation tooling ready; production load not run
+2. Stable ranked lifecycle and rating jobs for 7+ days (Epic 3, 4) — Render cron Blueprint ready; live staging/prod cron not provisioned
 3. Challenge links work install → play → claim (Epic 6)
-4. All §34 acceptance criteria green
+4. All §34 acceptance criteria green, including verified Clerk auth in staging/prod with real credentials
 5. Privacy/legal live with account deletion (Epic 10)
 6. AdMob validated without ranked disruption (Epic 9)
 7. PostHog funnels for retention and social conversion (Epic 10)

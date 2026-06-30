@@ -144,6 +144,11 @@ export interface AuthContext {
   readonly guestToken?: string;
 }
 
+export interface GuestClaimContext {
+  readonly bearer: string;
+  readonly guestToken: string;
+}
+
 function headersFor(ctx: AuthContext): Record<string, string> {
   const headers: Record<string, string> = {};
   if (ctx.bearer) headers.Authorization = `Bearer ${ctx.bearer}`;
@@ -190,6 +195,12 @@ export const sdk = {
 
   async getMe(ctx: AuthContext): Promise<MeDTO> {
     return api.get<MeDTO>('/me', { headers: headersFor(ctx) });
+  },
+
+  async claimGuest(ctx: GuestClaimContext): Promise<MeDTO> {
+    return api.post<MeDTO>('/me/claim-guest', undefined, {
+      headers: headersFor(ctx),
+    });
   },
 
   async updateProfile(

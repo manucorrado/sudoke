@@ -1,10 +1,11 @@
 from datetime import datetime, timezone
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db.session import get_db
-from src.middleware.principal import require_user
+from src.middleware.principal import GUEST_HEADER, require_user
 from src.models import User
 from src.schemas.common import (
     MeResponse,
@@ -18,7 +19,11 @@ from src.services.streaks import (
     get_or_create_notification_preferences,
     sync_to_today,
 )
-from src.services.users import update_profile
+from src.services.users import (
+    GuestClaimError,
+    claim_guest_session,
+    update_profile,
+)
 
 router = APIRouter(prefix="/me", tags=["me"])
 
@@ -43,6 +48,31 @@ async def patch_profile(
                 detail="Username already taken",
             ) from exc
         raise
+
+
+@router.post("/claim-guest", response_model=MeResponse)
+async def claim_guest(
+    user: Annotated[User, Depends(require_user)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    guest_token: Annotated[str | None, Header(alias=GUEST_HEADER)] = None,
+) -> User:
+    if not guest_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "guest_token_required",
+                "message": "X-Guest-Token header is required",
+            },
+        )
+    try:
+        return await claim_guest_session(
+            session, user=user, guest_token=guest_token
+        )
+    except GuestClaimError as exc:
+        raise HTTPException(
+            status_code=exc.http_status,
+            detail={"code": exc.code, "message": exc.message},
+        ) from exc
 
 
 @router.get("/streak", response_model=StreakPublic)

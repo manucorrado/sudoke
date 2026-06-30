@@ -11,8 +11,9 @@ Content Pipeline** (PRD §10.2 / §21):
    (the source is CC0 / public-domain so review can be deferred to
    spot checks).
 4. Optionally bulk-schedules approved puzzles into ``daily_puzzles``
-   on consecutive UTC dates, following a weekly rotation
-   (Mon Easy … Sun Hard) when multiple difficulty banks are loaded.
+   on consecutive UTC dates, or into the launch weekly rotation
+   (Mon/Tue easy, Wed/Thu medium, Fri/Sat/Sun hard) with
+   ``--weekly-rotation`` when multiple difficulty banks are loaded.
 
 Idempotent: re-running with the same input file skips puzzles that are
 already in the database, and skips dates that already have a scheduled
@@ -26,6 +27,7 @@ Usage (SQLite dev):
         --difficulty easy \\
         --limit 120 \\
         --schedule \\
+        --weekly-rotation \\
         --schedule-start 2026-06-23
 
 The script creates tables on first run via ``Base.metadata.create_all``
@@ -77,6 +79,13 @@ ESTIMATED_RANGE_SECONDS: dict[DifficultyName, tuple[int, int]] = {
     "medium": (360, 900),
     "hard": (600, 1500),
     "expert": (900, 2400),
+}
+
+WEEKLY_ROTATION_WEEKDAYS: dict[DifficultyName, set[int]] = {
+    "easy": {0, 1},
+    "medium": {2, 3},
+    "hard": {4, 5, 6},
+    "expert": set(),
 }
 
 DEFAULT_SOURCE_NAME = "Sudoku Exchange Puzzle Bank"
@@ -279,14 +288,19 @@ async def schedule_puzzles(
     start_date: date,
     actor: User,
     stats: IngestStats,
+    allowed_weekdays: set[int] | None = None,
 ) -> list[DailyPuzzle]:
     """Append approved puzzles to the daily calendar, one per date.
 
     Skips dates already scheduled (idempotent re-run friendly).
+    If `allowed_weekdays` is set, only schedules onto those UTC weekdays
+    (`date.weekday()`: Mon=0 ... Sun=6).
     """
 
     if not puzzles:
         return []
+    if allowed_weekdays is not None and not allowed_weekdays:
+        raise ValueError("allowed_weekdays must contain at least one weekday")
 
     taken_dates = await session.execute(
         select(DailyPuzzle.scheduled_for).where(
@@ -299,6 +313,9 @@ async def schedule_puzzles(
     cursor = start_date
     queue = list(puzzles)
     while queue:
+        if allowed_weekdays is not None and cursor.weekday() not in allowed_weekdays:
+            cursor += timedelta(days=1)
+            continue
         if cursor in taken:
             stats.skipped_dates += 1
             cursor += timedelta(days=1)
@@ -327,6 +344,9 @@ async def schedule_puzzles(
             payload={
                 "count": len(scheduled),
                 "start_date": start_date.isoformat(),
+                "allowed_weekdays": (
+                    sorted(allowed_weekdays) if allowed_weekdays is not None else None
+                ),
             },
         )
     )
@@ -340,6 +360,7 @@ async def run(
     limit: int,
     do_schedule: bool,
     schedule_start: date,
+    weekly_rotation: bool,
     admin_auth_id: str,
 ) -> IngestStats:
     stats = IngestStats()
@@ -364,12 +385,16 @@ async def run(
                 stats=stats,
             )
             if do_schedule and inserted:
+                allowed_weekdays = (
+                    WEEKLY_ROTATION_WEEKDAYS[difficulty] if weekly_rotation else None
+                )
                 await schedule_puzzles(
                     session,
                     inserted,
                     start_date=schedule_start,
                     actor=actor,
                     stats=stats,
+                    allowed_weekdays=allowed_weekdays,
                 )
 
     return stats
@@ -405,6 +430,14 @@ def _arg_parser() -> argparse.ArgumentParser:
         help="UTC date for the first scheduled daily (YYYY-MM-DD).",
     )
     p.add_argument(
+        "--weekly-rotation",
+        action="store_true",
+        help=(
+            "When scheduling, place easy on Mon/Tue, medium on Wed/Thu, "
+            "and hard on Fri/Sat/Sun UTC dates."
+        ),
+    )
+    p.add_argument(
         "--admin-auth-id",
         default=DEFAULT_ADMIN_AUTH_ID,
         help="auth_provider_id of the admin User row to attribute audits to.",
@@ -424,6 +457,7 @@ async def _amain(args: argparse.Namespace) -> int:
             limit=args.limit,
             do_schedule=args.schedule,
             schedule_start=args.schedule_start,
+            weekly_rotation=args.weekly_rotation,
             admin_auth_id=args.admin_auth_id,
         )
     finally:

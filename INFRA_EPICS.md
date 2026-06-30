@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-The product codebase is ~70–95% through early epics locally, but **cloud infrastructure is essentially unbuilt**. Local dev has Docker Compose (Postgres + Redis + API), GitHub Actions CI (no deploy, no Playwright), and optional Sentry hooks. There is **no** `render.yaml`, staging/production environments, mobile build pipeline (EAS), domain/deep-link hosting, push notification credentials, PostHog, AdMob, Clerk production wiring, challenge web landing, admin deployment, backup/monitoring alerts, or secrets management beyond `.env.example` stubs.
+The product codebase is ~70–95% through early epics locally, but **cloud infrastructure is still not provisioned**. Local dev has Docker Compose (Postgres + Redis + API), GitHub Actions CI (no deploy, no Playwright), optional Sentry hooks, repo-side staging `render.yaml`, and expanded env examples. There are still **no live Render staging/production services**, mobile build pipeline (EAS), domain/deep-link hosting, push notification credentials, PostHog, AdMob, Clerk apps/credentials, challenge web landing, production admin auth, backup/monitoring alerts, or production secrets.
 
 This document turns those gaps into ordered **Infrastructure Epics (I0–I12)** that can be executed in parallel with product epics but **must complete before Epic 10 soft launch**.
 
@@ -24,13 +24,13 @@ This document turns those gaps into ordered **Infrastructure Epics (I0–I12)** 
 | Cron worker code (not deployed) | ✅ | `apps/api/src/jobs/worker.py`, `tick.py` |
 | Alembic migrations | ✅ | `0001_baseline`, `0002_rating_leaderboards` |
 | GitHub Actions CI | ✅ (no deploy) | `.github/workflows/ci.yml` — lint, typecheck, pytest |
-| Env templates | ⚠️ minimal | `.env.example`, `apps/api/.env.example` |
+| Env templates | ✅ expanded | `.env.example`, `apps/api/.env.example`, `apps/admin/.env.example`, `apps/mobile/.env.example` |
 | Redis in app logic | ⚠️ health check only | No queue/cache usage beyond ping |
 | Sentry | ⚠️ API optional only | `apps/api/src/main.py`; mobile dep present, not initialized |
-| Clerk | ⚠️ stub | JWT decode without verification; `ClerkBridge` passthrough |
-| Mobile API URL | ❌ hardcoded | `apps/mobile/src/lib/api.ts` → `localhost:8000` |
+| Clerk | ⚠️ repo-side wiring | API verifies Clerk JWKS outside dev; mobile mounts ClerkProvider/token bridge when configured; credentials/OAuth QA/webhooks remain |
+| Mobile API URL | ✅ env-backed | `EXPO_PUBLIC_API_BASE_URL` with local fallback |
 | Admin deployment | ❌ | Next.js dev server only; no Dockerfile / Render service |
-| Render / cloud IaC | ❌ | No `render.yaml` |
+| Render / cloud IaC | ⚠️ repo-side only | `render.yaml` staging Blueprint exists; live services not created |
 | EAS / store pipeline | ❌ | No `eas.json`, no store accounts documented |
 | Domains / universal links | ❌ | `app.json` has `scheme: sudoke` only; no `associatedDomains` |
 | Challenge web landing | ❌ | PRD §5.2 requires non-playable web card; only in-app stub |
@@ -40,7 +40,7 @@ This document turns those gaps into ordered **Infrastructure Epics (I0–I12)** 
 | Playwright CI | ❌ | Epic 3 exit criteria; not in CI |
 | DB tables for future epics | ❌ partial | Missing friendships, challenges, notifications, streaks, ads, analytics per PRD §27 |
 | Puzzle content in cloud DB | ❌ | Local bank under `data/` (gitignored); not loaded to any environment |
-| Production CORS | ❌ | `allow_origins=[]` when not development (`apps/api/src/main.py`) |
+| Production CORS | ⚠️ env-backed | `CORS_ALLOWED_ORIGINS` supported; staging/prod values must be set |
 | Backups / PITR / job alerts | ❌ | Not configured |
 
 ### PRD vs Repo Architectural Notes
@@ -119,19 +119,19 @@ flowchart TB
 | `API_V1_PREFIX` | Always | `/api/v1` | Keep consistent across envs |
 | `CLERK_SECRET_KEY` | Staging+ | Clerk Dashboard | Server-side JWT verification + webhooks |
 | `CLERK_PUBLISHABLE_KEY` | Staging+ | Clerk Dashboard | Optional on API if needed for JWKS metadata |
-| `CLERK_JWKS_URL` or `CLERK_ISSUER` | Production | Clerk Dashboard | Needed once JWT signature verification is implemented |
+| `CLERK_JWKS_URL` or `CLERK_ISSUER` | Production | Clerk Dashboard | Required by implemented JWT signature verification |
 | `CLERK_WEBHOOK_SIGNING_SECRET` | Production | Clerk Webhooks | User sync / deletion (PRD §30.1) |
 | `SENTRY_DSN` | Staging+ | Sentry project | Separate projects per env recommended |
 | `SENTRY_AUTH_TOKEN` | CI only | Sentry | Source map upload (if mobile/backend symbols) |
 | `POSTHOG_API_KEY` | Epic 10 | PostHog | Server-side events (PRD §29) |
 | `POSTHOG_HOST` | Epic 10 | PostHog | e.g. `https://us.i.posthog.com` |
-| `CORS_ALLOWED_ORIGINS` | Staging+ | **New — not in repo** | Comma-separated; must include admin origin, Expo web dev origin |
+| `CORS_ALLOWED_ORIGINS` | Staging+ | Env config | Comma-separated; must include admin origin, Expo web dev origin |
 | `ADMIN_DEV_BYPASS_ENABLED` | Never in prod | Literal `false` | Guard `X-Dev-Auth-User` (currently dev-only) |
 | `DAILY_RESET_UTC_HOUR` | Optional | App config / `app_config` table | If not DB-driven |
 | `EXPO_ACCESS_TOKEN` | Epic 8 | Expo account | Sending push via Expo Push API from API |
 | `CRON_SECRET` | Optional | `generateValue: true` | If cron invoked via HTTP instead of CLI |
 
-**Missing from `.env.example` today:** `CORS_ALLOWED_ORIGINS`, `CLERK_WEBHOOK_SIGNING_SECRET`, `CLERK_ISSUER`, `POSTHOG_*`, `EXPO_ACCESS_TOKEN`, staging/prod `DATABASE_URL` format notes.
+**Repo-side status:** API env examples now include `CORS_ALLOWED_ORIGINS`, Clerk issuer/JWKS/webhook placeholders, `POSTHOG_*`, and `EXPO_ACCESS_TOKEN`. Real staging/prod values remain manual secrets.
 
 ### Admin (`apps/admin`) — Render Web Service
 
@@ -144,13 +144,13 @@ flowchart TB
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Staging+ | Clerk | Browser sign-in for admins |
 | `NODE_ENV` | Always | `production` on Render | |
 
-**Missing today:** `.env.example` for admin; Dockerfile; production auth (still `X-Dev-Auth-User`).
+**Repo-side status:** `apps/admin/.env.example` exists. Production admin auth still needs Clerk middleware/session-to-API bearer wiring; `X-Dev-Auth-User` remains local development only on the API.
 
 ### Mobile (`apps/mobile`) — EAS Build / local
 
 | Variable | Required when | Source | Notes |
 |----------|---------------|--------|-------|
-| `EXPO_PUBLIC_API_BASE_URL` | Always | **New — not in repo** | `https://api.sudoke.app/api/v1` (staging/prod) |
+| `EXPO_PUBLIC_API_BASE_URL` | Always | Expo env | `https://api.sudoke.app/api/v1` (staging/prod) |
 | `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` | Staging+ | Clerk | Referenced in `clerk-bridge.tsx` |
 | `EXPO_PUBLIC_POSTHOG_KEY` | Epic 10 | PostHog | Client analytics |
 | `EXPO_PUBLIC_POSTHOG_HOST` | Epic 10 | PostHog | |
@@ -170,7 +170,7 @@ flowchart TB
 | Google Service Account (FCM v1) | Android | Push (Epic 8) |
 | `google-services.json` | Android | FCM registration (`expo.android.googleServicesFile`) |
 
-**Missing today:** `eas.json`, `app.config.ts` with `extra.eas.projectId`, `EXPO_PUBLIC_API_BASE_URL` wiring in `api.ts`.
+**Repo-side status:** `EXPO_PUBLIC_API_BASE_URL` is wired in `api.ts`, and `apps/mobile/.env.example` exists. `eas.json` and `app.config.ts` with `extra.eas.projectId` are still missing.
 
 ### CI / GitHub Actions
 
@@ -222,9 +222,9 @@ flowchart TB
 
 ### CORS (Production Gap)
 
-Today production sets `allow_origins=[]`, which **blocks all browser origins**. Before any Expo Web or admin browser access to the public API:
+Production/staging CORS is now env-backed. Before any Expo Web or admin browser access to the public API:
 
-1. Add `CORS_ALLOWED_ORIGINS` to `Settings`.
+1. `CORS_ALLOWED_ORIGINS` is implemented in `Settings`.
 2. Set staging: admin URL, Expo web preview URL, local dev (optional).
 3. Set production: admin URL only (mobile native calls are not CORS-gated).
 
@@ -333,7 +333,7 @@ Epics are ordered by dependency. **I0–I3** unblock staging; **I4–I8** align 
 | `healthCheckPath` | `/api/v1/health/ready` |
 | Custom domain | `api.staging.sudoke.app`, `api.sudoke.app` |
 | TLS | Automatic via Render |
-| `CORS_ALLOWED_ORIGINS` | Implement + configure per env |
+| `CORS_ALLOWED_ORIGINS` | Implemented; configure per env |
 | Clerk JWT verification | Production JWKS fetch (remove unverified decode) |
 | `POST /webhooks/clerk` | User lifecycle + account deletion (PRD §30.1) |
 | Disable public `/docs` in production | Or IP allowlist / basic auth |
@@ -423,7 +423,7 @@ Epics are ordered by dependency. **I0–I3** unblock staging; **I4–I8** align 
 |------|--------|
 | `eas.json` | `development`, `preview`, `production` profiles |
 | `app.config.ts` | Dynamic `EXPO_PUBLIC_*`, `extra.eas.projectId`, plugins |
-| Wire `EXPO_PUBLIC_API_BASE_URL` | Replace hardcoded localhost in `apps/mobile/src/lib/api.ts` |
+| Wire `EXPO_PUBLIC_API_BASE_URL` | Done in `apps/mobile/src/lib/api.ts`; set per EAS build profile |
 | EAS Build in CI | `eas build --profile preview` on release branches |
 | TestFlight + Play Internal Testing | Staging distribution |
 | App Store / Play production tracks | For public launch (Epic 10) |
@@ -451,7 +451,7 @@ Epics are ordered by dependency. **I0–I3** unblock staging; **I4–I8** align 
 | Item | Detail |
 |------|--------|
 | Clerk apps | Separate dev / staging / production |
-| Mobile `ClerkProvider` mount | Implement `clerk-bridge.tsx` |
+| Mobile `ClerkProvider` mount | Implemented in `clerk-bridge.tsx`; requires publishable key |
 | API JWKS verification | `python-jose` + Clerk JWKS URL |
 | Clerk webhook endpoint on API | `user.created`, `user.updated`, `user.deleted` |
 | Admin Clerk middleware | Next.js server auth |
@@ -720,9 +720,9 @@ Per PRD §33 — do **not** provision:
 
 ---
 
-## Appendix A — Minimal `render.yaml` Skeleton (Not in Repo)
+## Appendix A — Minimal `render.yaml` Skeleton (Implemented for Staging)
 
-Reference only — implement in **I0**:
+Reference only — staging implementation now lives in `render.yaml`:
 
 ```yaml
 # render.yaml (skeleton — adjust plans, repos, branches)
@@ -805,12 +805,12 @@ services:
 
 | File | Epic |
 |------|------|
-| `render.yaml` | I0 |
+| `render.yaml` | I0 — staging Blueprint added; live Render services not provisioned |
 | `apps/admin/Dockerfile` | I4 |
-| `apps/admin/.env.example` | I4 |
+| `apps/admin/.env.example` | I4 — added |
 | `eas.json` | I5 |
 | `apps/mobile/app.config.ts` | I5, I7 |
-| `apps/mobile/.env.example` | I5 |
+| `apps/mobile/.env.example` | I5 — added |
 | `.github/workflows/deploy-staging.yml` | I0, I11 |
 | `.github/workflows/playwright.yml` | I11 |
 | `playwright.config.ts` | I11 |
@@ -818,7 +818,7 @@ services:
 | `public/.well-known/apple-app-site-association` | I7 |
 | `public/.well-known/assetlinks.json` | I7 |
 | `apps/api/src/api/v1/webhooks/clerk.py` | I6 |
-| `apps/api/src/config.py` — `CORS_ALLOWED_ORIGINS` | I2 |
+| `apps/api/src/config.py` — `CORS_ALLOWED_ORIGINS` | I2 — added |
 | `docs/infra/runbook.md` | I12 |
 
 ---
