@@ -4,7 +4,7 @@ import {
   makeRankedRules,
   parseGridString,
   serializeGrid,
-  solve,
+  validatePuzzle,
   type GameState,
   type Puzzle,
   type PuzzleDifficulty,
@@ -27,14 +27,16 @@ function buildPuzzleFromDaily(daily: DailyPuzzleDTO): Puzzle {
   // the engine can enforce immediate wrong-answer detection (§8.1) without
   // sending the solution over the wire. Server still re-validates on submit.
   const givens = parseGridString(daily.givens);
-  const solution = solve(givens);
-  if (!solution) {
-    throw new Error(`Daily puzzle ${daily.id} has no solution`);
+  const validated = validatePuzzle({ givens });
+  if (!validated.ok) {
+    throw new Error(
+      `Daily puzzle ${daily.id} failed validation: ${validated.issues.join('; ')}`,
+    );
   }
   return {
     id: daily.id,
     givens,
-    solution,
+    solution: validated.solution,
     metadata: {
       difficulty: daily.difficulty,
       estimatedSolveTimeSeconds: {

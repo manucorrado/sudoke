@@ -24,6 +24,18 @@ EASY_SOLUTION = (
     "345286179"
 )
 
+SCREENSHOT_INVALID = (
+    "530070000"
+    "060019500"
+    "000980000"
+    "060800006"
+    "000340008"
+    "030017000"
+    "020006060"
+    "000028000"
+    "004190005"
+)
+
 
 def test_solve_easy() -> None:
     grid = sudoku.parse_grid(EASY)
@@ -41,6 +53,24 @@ def test_validate_puzzle_ok() -> None:
 def test_validate_puzzle_non_unique() -> None:
     result = sudoku.validate_puzzle([0] * 81)
     assert result.ok is False
+
+
+def test_validate_puzzle_reports_duplicate_givens() -> None:
+    result = sudoku.validate_puzzle(sudoku.parse_grid("55" + "0" * 79))
+    assert result.ok is False
+    assert "given conflict" in " ".join(result.issues).lower()
+
+
+def test_validate_puzzle_rejects_malformed_values() -> None:
+    result = sudoku.validate_puzzle([10] + [0] * 80)
+    assert result.ok is False
+    assert "integer 0..9" in " ".join(result.issues)
+
+
+def test_validate_puzzle_rejects_screenshot_invalid_grid() -> None:
+    result = sudoku.validate_puzzle(sudoku.parse_grid(SCREENSHOT_INVALID))
+    assert result.ok is False
+    assert "given conflict" in " ".join(result.issues).lower()
 
 
 def test_validate_submission_full_solution() -> None:

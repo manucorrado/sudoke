@@ -1,5 +1,13 @@
-import { TOTAL_CELLS } from './constants';
-import { clueCount, isCellValue, isCompleteSolution, serializeGrid } from './grid';
+import { GRID_SIZE, TOTAL_CELLS } from './constants';
+import {
+  boxIndexes,
+  clueCount,
+  colIndexes,
+  isCellValue,
+  isCompleteSolution,
+  rowIndexes,
+  serializeGrid,
+} from './grid';
 import { hasUniqueSolution, solve } from './solver';
 import type { RawGrid, SolutionGrid } from './types';
 
@@ -22,6 +30,38 @@ export interface ValidatePuzzleInput {
   readonly solution?: SolutionGrid;
   /** Minimum clue count (default 17 — fewer cannot have a unique solution). */
   readonly minClues?: number;
+}
+
+function conflictIssuesForGroup(
+  givens: RawGrid,
+  indexes: readonly number[],
+  label: string,
+): readonly string[] {
+  const seen = new Map<number, number>();
+  const issues: string[] = [];
+  for (const index of indexes) {
+    const value = givens[index];
+    if (!value) continue;
+    const previous = seen.get(value);
+    if (previous !== undefined) {
+      issues.push(
+        `Given conflict: value ${value} appears at indexes ${previous} and ${index} in ${label}`,
+      );
+    } else {
+      seen.set(value, index);
+    }
+  }
+  return issues;
+}
+
+function givenConflictIssues(givens: RawGrid): readonly string[] {
+  const issues: string[] = [];
+  for (let group = 0; group < GRID_SIZE; group += 1) {
+    issues.push(...conflictIssuesForGroup(givens, rowIndexes(group), `row ${group + 1}`));
+    issues.push(...conflictIssuesForGroup(givens, colIndexes(group), `column ${group + 1}`));
+    issues.push(...conflictIssuesForGroup(givens, boxIndexes(group), `box ${group + 1}`));
+  }
+  return issues;
 }
 
 /**
@@ -55,6 +95,12 @@ export function validatePuzzle(input: ValidatePuzzleInput): PuzzleValidationResu
   const clues = clueCount(givens);
   if (clues < minClues) {
     issues.push(`Puzzle has ${clues} clues; minimum is ${minClues}`);
+  }
+
+  const conflictIssues = givenConflictIssues(givens);
+  if (conflictIssues.length > 0) {
+    issues.push(...conflictIssues);
+    return { ok: false, issues };
   }
 
   const solutions = solve(givens);

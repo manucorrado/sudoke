@@ -10,6 +10,7 @@ from src.sudoku.engine import (
     SudokuError,
     ValidationResult,
     find_solutions,
+    given_conflict_issues,
     has_unique_solution,
     is_complete_solution,
     parse_grid,
@@ -20,11 +21,12 @@ from src.sudoku.engine import (
 )
 
 __all__ = [
-    "GameRules",
     "SUSPICIOUS_SOLVE_THRESHOLDS_SECONDS",
+    "GameRules",
     "SudokuError",
     "ValidationResult",
     "find_solutions",
+    "given_conflict_issues",
     "has_unique_solution",
     "is_complete_solution",
     "parse_grid",

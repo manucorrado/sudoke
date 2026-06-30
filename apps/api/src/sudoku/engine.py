@@ -33,7 +33,7 @@ class GameRules:
     max_mistakes: int | None
 
     @classmethod
-    def ranked(cls) -> "GameRules":
+    def ranked(cls) -> GameRules:
         return cls(mode="ranked", max_mistakes=MAX_RANKED_MISTAKES)
 
 
@@ -81,6 +81,72 @@ def _box(idx: int) -> int:
     return (_row(idx) // BOX_SIZE) * BOX_SIZE + (_col(idx) // BOX_SIZE)
 
 
+def _grid_value_issues(grid: list[int], *, label: str) -> tuple[str, ...]:
+    issues: list[str] = []
+    for i, value in enumerate(grid):
+        if type(value) is not int or value < 0 or value > 9:
+            issues.append(
+                f"{label} value at index {i} must be an integer 0..9 "
+                f"(received {value!r})"
+            )
+    return tuple(issues)
+
+
+def _box_indexes(box: int) -> list[int]:
+    box_row = (box // BOX_SIZE) * BOX_SIZE
+    box_col = (box % BOX_SIZE) * BOX_SIZE
+    return [
+        row * GRID_SIZE + col
+        for row in range(box_row, box_row + BOX_SIZE)
+        for col in range(box_col, box_col + BOX_SIZE)
+    ]
+
+
+def _conflict_issues_for_group(
+    grid: list[int], *, indexes: list[int], label: str
+) -> tuple[str, ...]:
+    seen: dict[int, int] = {}
+    issues: list[str] = []
+    for idx in indexes:
+        value = grid[idx]
+        if value == 0:
+            continue
+        previous = seen.get(value)
+        if previous is not None:
+            issues.append(
+                f"Given conflict: value {value} appears at indexes "
+                f"{previous} and {idx} in {label}"
+            )
+        else:
+            seen[value] = idx
+    return tuple(issues)
+
+
+def given_conflict_issues(grid: list[int]) -> tuple[str, ...]:
+    """Return row/column/box duplicate conflicts among puzzle givens."""
+
+    issues: list[str] = []
+    for group in range(GRID_SIZE):
+        row_indexes = [group * GRID_SIZE + col for col in range(GRID_SIZE)]
+        col_indexes = [row * GRID_SIZE + group for row in range(GRID_SIZE)]
+        issues.extend(
+            _conflict_issues_for_group(
+                grid, indexes=row_indexes, label=f"row {group + 1}"
+            )
+        )
+        issues.extend(
+            _conflict_issues_for_group(
+                grid, indexes=col_indexes, label=f"column {group + 1}"
+            )
+        )
+        issues.extend(
+            _conflict_issues_for_group(
+                grid, indexes=_box_indexes(group), label=f"box {group + 1}"
+            )
+        )
+    return tuple(issues)
+
+
 def _init_masks(grid: list[int]) -> tuple[list[int], list[int], list[int]] | None:
     rows = [0] * GRID_SIZE
     cols = [0] * GRID_SIZE
@@ -102,7 +168,9 @@ def _popcount(n: int) -> int:
     return bin(n).count("1")
 
 
-def _find_best(grid: list[int], rows: list[int], cols: list[int], boxes: list[int]) -> tuple[int, int]:
+def _find_best(
+    grid: list[int], rows: list[int], cols: list[int], boxes: list[int]
+) -> tuple[int, int]:
     best_idx = -1
     best_candidates = 0
     best_count = 10
@@ -213,11 +281,27 @@ def validate_puzzle(
 ) -> ValidationResult:
     issues: list[str] = []
     if len(givens) != TOTAL_CELLS:
-        return ValidationResult(False, (f"givens must have {TOTAL_CELLS} cells",), None, 0)
+        return ValidationResult(
+            False, (f"givens must have {TOTAL_CELLS} cells",), None, 0
+        )
+
+    value_issues = _grid_value_issues(givens, label="Given")
+    if value_issues:
+        return ValidationResult(
+            False,
+            value_issues,
+            None,
+            sum(1 for value in givens if type(value) is int and value != 0),
+        )
 
     clue_count = sum(1 for v in givens if v != 0)
     if clue_count < min_clues:
         issues.append(f"Puzzle has {clue_count} clues; minimum is {min_clues}")
+
+    conflict_issues = given_conflict_issues(givens)
+    if conflict_issues:
+        issues.extend(conflict_issues)
+        return ValidationResult(False, tuple(issues), None, clue_count)
 
     sols = find_solutions(givens, 2)
     if not sols:
@@ -231,15 +315,21 @@ def validate_puzzle(
     if solution is not None:
         if len(solution) != TOTAL_CELLS:
             issues.append(f"Solution must have {TOTAL_CELLS} cells")
-        elif not is_complete_solution(solution):
-            issues.append("Provided solution is not a valid completed Sudoku grid")
-        elif solution != canonical:
-            issues.append("Provided solution does not match computed unique solution")
         else:
-            for i, (g, s) in enumerate(zip(givens, solution, strict=True)):
-                if g != 0 and g != s:
-                    issues.append(f"Given at index {i} disagrees with solution")
-                    break
+            solution_value_issues = _grid_value_issues(solution, label="Solution")
+            if solution_value_issues:
+                issues.extend(solution_value_issues)
+            elif not is_complete_solution(solution):
+                issues.append("Provided solution is not a valid completed Sudoku grid")
+            elif solution != canonical:
+                issues.append(
+                    "Provided solution does not match computed unique solution"
+                )
+            else:
+                for i, (g, s) in enumerate(zip(givens, solution, strict=True)):
+                    if g != 0 and g != s:
+                        issues.append(f"Given at index {i} disagrees with solution")
+                        break
 
     return ValidationResult(
         ok=not issues,
@@ -273,4 +363,8 @@ def validate_submission(submitted: list[int], solution: list[int]) -> Submission
             continue
         if submitted[i] != solution[i]:
             wrong.append(i)
-    return SubmissionResult(valid=full and not wrong, mistakes=len(wrong), wrong_indices=tuple(wrong))
+    return SubmissionResult(
+        valid=full and not wrong,
+        mistakes=len(wrong),
+        wrong_indices=tuple(wrong),
+    )
