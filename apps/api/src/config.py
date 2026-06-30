@@ -28,6 +28,16 @@ class Settings(BaseSettings):
     POSTHOG_HOST: str | None = None
     EXPO_ACCESS_TOKEN: str | None = None
 
+    # Comma-separated list of browser origins allowed by CORS in non-dev
+    # environments (e.g. the admin dashboard). Native mobile clients are
+    # not CORS-gated. In development all origins are allowed.
+    CORS_ALLOWED_ORIGINS: str = ""
+
+    # Honors the X-Dev-Auth-User bypass header outside of development.
+    # Must remain false in production; may be enabled in staging until
+    # Clerk auth is wired end-to-end.
+    ADMIN_DEV_BYPASS_ENABLED: bool = False
+
     # Base URL for human-readable challenge share links. The mobile app
     # also handles `sudoke://c/{code}` deep links — see /c/[code].
     CHALLENGE_SHARE_BASE_URL: str = "https://sudoke.app/c"
@@ -41,6 +51,28 @@ class Settings(BaseSettings):
             return value.replace("postgres://", "postgresql+asyncpg://", 1)
         if value.startswith("postgresql://"):
             return value.replace("postgresql://", "postgresql+asyncpg://", 1)
+    def _normalize_database_url(cls, value: str) -> str:
+        """Coerce managed Postgres URLs to the asyncpg driver.
+
+        Render exposes connection strings as ``postgres://`` or
+        ``postgresql://`` without a driver suffix, but the SQLAlchemy async
+        engine requires ``postgresql+asyncpg://``. Other schemes (sqlite,
+        already-qualified asyncpg URLs) are left untouched.
+        """
+        import sys
+
+        scheme = value.split("://")[0] if "://" in value else "(no scheme)"
+        print(
+            f"DATABASE_URL diagnostic: scheme={scheme!r}, "
+            f"len={len(value)}, has_at={'@' in value}, "
+            f"first_20={value[:20]!r}",
+            file=sys.stderr,
+        )
+
+        if value.startswith("postgres://"):
+            return "postgresql+asyncpg://" + value[len("postgres://") :]
+        if value.startswith("postgresql://"):
+            return "postgresql+asyncpg://" + value[len("postgresql://") :]
         return value
 
     @property
@@ -49,6 +81,7 @@ class Settings(BaseSettings):
 
     @property
     def cors_allowed_origins(self) -> list[str]:
+    def cors_origins(self) -> list[str]:
         if self.is_development:
             return ["*"]
         return [

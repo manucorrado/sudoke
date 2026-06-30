@@ -147,11 +147,13 @@ async def get_current_user(
 
     In development the API also accepts an ``X-Dev-Auth-User`` header
     which short-circuits JWT decoding. This is used by the admin UI to
-    authenticate without standing up a full Clerk session, and is never
-    honored outside of `ENVIRONMENT=development`.
+    authenticate without standing up a full Clerk session. Outside of
+    development it is only honored when ``ADMIN_DEV_BYPASS_ENABLED`` is set
+    (intended for staging until Clerk auth is wired) and must stay off in
+    production.
     """
 
-    if dev_user and settings.is_development:
+    if dev_user and (settings.is_development or settings.ADMIN_DEV_BYPASS_ENABLED):
         return AuthenticatedUser(user_id=dev_user)
     if credentials is None:
         return None
