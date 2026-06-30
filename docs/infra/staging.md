@@ -34,6 +34,12 @@ REDIS_URL=<Render Redis connection string>
 `DATABASE_URL` may be Render's default `postgresql://` URL; the API normalizes
 it to SQLAlchemy's asyncpg driver form at startup.
 
+Push delivery is opt-in. Leave `EXPO_PUSH_ENABLED` unset/`false` (the default)
+until APNs/FCM credentials and an Expo project exist — device registration via
+`POST /me/push-tokens` still works and dispatch is a safe no-op. When enabling,
+set `EXPO_PUSH_ENABLED=true` and `EXPO_ACCESS_TOKEN=<expo-push-token>` so the API
+can authenticate to the Expo Push API.
+
 ## Mobile Staging Build
 
 Set Expo public env before a preview/staging build:
