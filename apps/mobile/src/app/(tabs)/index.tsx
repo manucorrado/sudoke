@@ -4,6 +4,7 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -21,7 +22,18 @@ import {
   myResultKey,
   useMyDailyResult,
 } from '@/features/leaderboard/useLeaderboard';
-import { sdk, type AttemptDTO } from '@/lib/sdk';
+import { ChallengeComparisonCard, type ChallengeOutcome } from '@/features/social/ChallengeComparisonCard';
+import { getPendingChallenge } from '@/features/social/pendingChallenge';
+import { usePendingChallenge } from '@/features/social/usePendingChallenge';
+import { useCreateChallenge } from '@/features/social/useSocial';
+import { useRecordChallengeResult } from '@/features/social/useRecordChallengeResult';
+import {
+  sdk,
+  type AttemptDTO,
+  type AuthContext,
+  type ChallengeAcceptanceDTO,
+  type ChallengeDetailDTO,
+} from '@/lib/sdk';
 import { useAuth } from '@/providers/auth';
 import { colors, fontSize, radius, spacing } from '@/theme/tokens';
 
@@ -36,7 +48,16 @@ export function TodayScreen() {
   const [phase, setPhase] = useState<Phase>('idle');
   const [attempt, setAttempt] = useState<AttemptDTO | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [challengeRecordError, setChallengeRecordError] = useState<string | null>(null);
+  const [challengeMismatch, setChallengeMismatch] = useState<string | null>(null);
+  const [challengeAcceptance, setChallengeAcceptance] =
+    useState<ChallengeAcceptanceDTO | null>(null);
+  const [completedChallenge, setCompletedChallenge] =
+    useState<ChallengeDetailDTO | null>(null);
   const [busy, setBusy] = useState(false);
+  const createChallenge = useCreateChallenge();
+  const recordChallengeResult = useRecordChallengeResult();
+  const pendingChallenge = usePendingChallenge(phase !== 'in_attempt');
   const myResult = useMyDailyResult(
     phase === 'completed' ? daily.data?.id : undefined,
   );
@@ -72,6 +93,9 @@ export function TodayScreen() {
   }
 
   const dailyData = daily.data!;
+  const pendingMismatch =
+    pendingChallenge.detail !== null &&
+    pendingChallenge.detail.challenge.daily_puzzle_id !== dailyData.id;
 
   if (phase === 'in_attempt' && attempt) {
     return (
@@ -82,16 +106,79 @@ export function TodayScreen() {
           setPhase('idle');
           setAttempt(null);
         }}
-        onCompleted={(result) => {
-          setAttempt(result);
-          setPhase('completed');
-        }}
+        onCompleted={(result) => void handleCompleted(result)}
       />
     );
   }
 
+  async function handleCompleted(result: AttemptDTO) {
+    setAttempt(result);
+    setPhase('completed');
+    setChallengeRecordError(null);
+    setChallengeMismatch(null);
+    setChallengeAcceptance(null);
+    setCompletedChallenge(null);
+
+    await recordPendingChallenge(result);
+  }
+
+  async function recordPendingChallenge(result: AttemptDTO) {
+    setChallengeRecordError(null);
+    setChallengeMismatch(null);
+
+    if (!isRecordableChallengeAttempt(result)) {
+      return;
+    }
+
+    const storedPending =
+      pendingChallenge.code === null ? await getPendingChallenge() : null;
+    const pendingCode =
+      (pendingChallenge.code ?? storedPending?.code?.trim()) || null;
+    if (pendingCode === null) {
+      return;
+    }
+
+    let detail = pendingChallenge.detail;
+    if (detail === null && pendingChallenge.code !== null) {
+      detail = (await pendingChallenge.refetch()).data ?? null;
+    }
+    detail = detail ?? (await resolveChallenge(pendingCode, authCtx));
+    if (detail === null) {
+      setChallengeRecordError('Challenge details could not be loaded. Try saving again.');
+      return;
+    }
+
+    if (detail.challenge.daily_puzzle_id !== result.daily_puzzle_id) {
+      setChallengeMismatch(
+        `This challenge was for ${detail.daily_scheduled_for}. Today's puzzle is different.`,
+      );
+      return;
+    }
+
+    try {
+      let ctx: AuthContext = authCtx;
+      if (!ctx.bearer && !ctx.guestToken) {
+        const token = await ensureGuest();
+        ctx = { ...ctx, guestToken: token };
+      }
+      const acceptance = await recordChallengeResult.mutateAsync({
+        challengeId: detail.challenge.id,
+        authCtx: ctx,
+      });
+      setChallengeAcceptance(acceptance);
+      setCompletedChallenge(detail);
+      await pendingChallenge.clear();
+    } catch (err) {
+      setChallengeRecordError(
+        err instanceof Error ? err.message : 'Challenge result was not saved.',
+      );
+    }
+  }
+
   async function handleStart() {
     setError(null);
+    setChallengeRecordError(null);
+    setChallengeMismatch(null);
     setBusy(true);
     try {
       let ctx = authCtx;
@@ -109,6 +196,25 @@ export function TodayScreen() {
       setError(err instanceof Error ? err.message : 'Failed to start');
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function handleShareChallenge() {
+    setError(null);
+    try {
+      const challenge = await createChallenge.mutateAsync({
+        daily_puzzle_id: dailyData.id,
+      });
+      const timeText =
+        attempt?.official_duration_ms !== null && attempt?.official_duration_ms !== undefined
+          ? formatDuration(attempt.official_duration_ms)
+          : "today's daily";
+      await Share.share({
+        message: `I solved today's Sudoke in ${timeText} — can you beat me? ${challenge.share_url}`,
+        url: challenge.share_url,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create challenge');
     }
   }
 
@@ -149,13 +255,49 @@ export function TodayScreen() {
       <Countdown endsAt={dailyData.finalize_at} />
 
       {phase === 'completed' && attempt ? (
-        <PostGameResultCard
-          attempt={attempt}
-          myResult={myResult.data ?? null}
-          isLoading={myResult.isLoading}
-          isGuest={isGuest}
-          {...(isGuest ? { onSignIn: () => router.push('/sign-in') } : {})}
-        />
+        <>
+          <PostGameResultCard
+            attempt={attempt}
+            myResult={myResult.data ?? null}
+            isLoading={myResult.isLoading}
+            isGuest={isGuest}
+            {...(!isGuest && authStatus === 'authenticated'
+              ? { onShareChallenge: handleShareChallenge }
+              : {})}
+            {...(isGuest ? { onSignIn: () => router.push('/sign-in') } : {})}
+          />
+          {challengeAcceptance && completedChallenge && challengeAcceptance.duration_ms !== null ? (
+            <ChallengeComparisonCard
+              challengerName={challengerName(completedChallenge)}
+              challengerDurationMs={completedChallenge.challenge.challenger_duration_ms}
+              challengerMistakes={completedChallenge.challenge.challenger_mistakes}
+              recipientDurationMs={challengeAcceptance.duration_ms}
+              recipientMistakes={challengeAcceptance.mistakes ?? attempt.mistakes}
+              outcome={challengeOutcome(
+                challengeAcceptance.duration_ms,
+                challengeAcceptance.mistakes ?? attempt.mistakes,
+                completedChallenge.challenge.challenger_duration_ms,
+                completedChallenge.challenge.challenger_mistakes,
+              )}
+            />
+          ) : null}
+          {challengeMismatch ? <Text style={styles.warning}>{challengeMismatch}</Text> : null}
+          {challengeRecordError ? (
+            <Text style={styles.error}>{challengeRecordError}</Text>
+          ) : null}
+          {challengeRecordError ? (
+            <Pressable
+              style={[styles.secondaryCta, recordChallengeResult.isPending && styles.disabled]}
+              disabled={recordChallengeResult.isPending}
+              onPress={() => void recordPendingChallenge(attempt)}
+              accessibilityRole="button"
+            >
+              <Text style={styles.secondaryCtaText}>
+                {recordChallengeResult.isPending ? 'Saving…' : 'Save challenge result'}
+              </Text>
+            </Pressable>
+          ) : null}
+        </>
       ) : (
         <Pressable onPress={handleStart} disabled={busy} style={styles.cta}>
           <Text style={styles.ctaText}>
@@ -163,6 +305,13 @@ export function TodayScreen() {
           </Text>
         </Pressable>
       )}
+
+      {phase !== 'completed' && pendingMismatch ? (
+        <Text style={styles.warning}>
+          This saved challenge was for {pendingChallenge.detail?.daily_scheduled_for}. Today's
+          puzzle is different, so it will not be recorded.
+        </Text>
+      ) : null}
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -184,6 +333,57 @@ export function TodayScreen() {
       ) : null}
     </ScrollView>
   );
+}
+
+function formatDuration(ms: number): string {
+  const totalSeconds = Math.round(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+function isRecordableChallengeAttempt(attempt: AttemptDTO): boolean {
+  if (attempt.official_duration_ms === null) return false;
+  return (
+    attempt.status === 'validated' ||
+    attempt.status === 'provisional_ranked' ||
+    attempt.status === 'finalized' ||
+    attempt.status === 'under_review'
+  );
+}
+
+async function resolveChallenge(
+  code: string,
+  authCtx: AuthContext,
+): Promise<ChallengeDetailDTO | null> {
+  try {
+    return await sdk.resolveChallengeByCode(code, authCtx);
+  } catch {
+    return null;
+  }
+}
+
+function challengerName(detail: ChallengeDetailDTO): string {
+  return (
+    detail.challenge.challenger_display_name ||
+    detail.challenge.challenger_username ||
+    'Your friend'
+  );
+}
+
+function challengeOutcome(
+  recipientDurationMs: number,
+  recipientMistakes: number,
+  challengerDurationMs: number | null,
+  challengerMistakes: number | null,
+): ChallengeOutcome {
+  if (challengerDurationMs === null) return 'pending';
+  if (recipientDurationMs < challengerDurationMs) return 'win';
+  if (recipientDurationMs > challengerDurationMs) return 'lose';
+  if (challengerMistakes === null) return 'tie';
+  if (recipientMistakes < challengerMistakes) return 'win';
+  if (recipientMistakes > challengerMistakes) return 'lose';
+  return 'tie';
 }
 
 const styles = StyleSheet.create({
@@ -225,9 +425,25 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   ctaText: { color: colors.textInverse, fontSize: fontSize.md, fontWeight: '700' },
+  secondaryCta: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: 1,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    alignItems: 'center',
+  },
+  secondaryCtaText: { color: colors.text, fontSize: fontSize.md, fontWeight: '700' },
   error: {
     backgroundColor: colors.dangerMuted,
     color: colors.danger,
+    padding: spacing.sm,
+    borderRadius: radius.md,
+  },
+  disabled: { opacity: 0.6 },
+  warning: {
+    backgroundColor: colors.warningMuted,
+    color: colors.warning,
     padding: spacing.sm,
     borderRadius: radius.md,
   },

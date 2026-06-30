@@ -12,9 +12,10 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { appStorage, StorageKeys } from '@/lib/storage';
+import { setPendingChallenge } from '@/features/social/pendingChallenge';
 import { useAuth } from '@/providers/auth';
 import { useResolveChallenge } from '@/features/social/useSocial';
+import { sdk } from '@/lib/sdk';
 import { colors, fontSize, radius, spacing } from '@/theme/tokens';
 
 export function ChallengeLandingScreen() {
@@ -22,22 +23,39 @@ export function ChallengeLandingScreen() {
   const params = useLocalSearchParams<{ code?: string | string[] }>();
   const rawCode = Array.isArray(params.code) ? params.code[0] : params.code;
   const code = typeof rawCode === 'string' ? rawCode.trim() : '';
-  const { ensureGuest, status } = useAuth();
+  const { authCtx, ensureGuest, status } = useAuth();
   const [busy, setBusy] = useState(false);
+  const [dailyMismatch, setDailyMismatch] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const challenge = useResolveChallenge(code || null);
 
   useEffect(() => {
-    if (!code) return;
-    void appStorage.set(StorageKeys.pendingChallengeCode, code);
-  }, [code]);
+    if (!code || !challenge.data) return;
+    void setPendingChallenge(code, challenge.data);
+  }, [challenge.data, code]);
 
   async function play() {
+    if (!challenge.data) return;
+    setDailyMismatch(null);
+    setError(null);
     setBusy(true);
     try {
+      let ctx = authCtx;
       if (status === 'anonymous') {
-        await ensureGuest();
+        const token = await ensureGuest();
+        ctx = { ...ctx, guestToken: token };
       }
+      const currentDaily = await sdk.getCurrentDaily(ctx);
+      if (currentDaily.id !== challenge.data.challenge.daily_puzzle_id) {
+        setDailyMismatch(
+          `This challenge was for ${challenge.data.daily_scheduled_for}. Today's puzzle is different.`,
+        );
+        return;
+      }
+      await setPendingChallenge(code, challenge.data);
       router.replace('/');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not start this challenge.');
     } finally {
       setBusy(false);
     }
@@ -86,8 +104,8 @@ export function ChallengeLandingScreen() {
         </View>
       ) : (
         <Text style={styles.subtitle}>
-          We couldn't resolve this challenge right now. We've saved your code so you can pick up
-          where you left off after launching the app.
+          We couldn't resolve this challenge right now. Check the link or ask your friend to
+          resend it.
         </Text>
       )}
 
@@ -99,21 +117,28 @@ export function ChallengeLandingScreen() {
       <Pressable
         style={[styles.button, busy && styles.buttonDisabled]}
         onPress={play}
-        disabled={busy}
+        disabled={busy || !challenge.data}
         accessibilityRole="button"
       >
         {busy ? (
           <ActivityIndicator color={colors.textInverse} />
         ) : (
-          <Text style={styles.buttonText}>Play as guest</Text>
+          <Text style={styles.buttonText}>
+            {status === 'authenticated' ? 'Play challenge' : 'Play as guest'}
+          </Text>
         )}
       </Pressable>
-      <Pressable
-        style={[styles.button, styles.buttonSecondary]}
-        onPress={() => router.replace('/sign-in')}
-      >
-        <Text style={styles.buttonSecondaryText}>Sign in first</Text>
-      </Pressable>
+      {status === 'authenticated' ? null : (
+        <Pressable
+          style={[styles.button, styles.buttonSecondary]}
+          onPress={() => router.replace('/sign-in')}
+        >
+          <Text style={styles.buttonSecondaryText}>Sign in first</Text>
+        </Pressable>
+      )}
+
+      {dailyMismatch ? <Text style={styles.error}>{dailyMismatch}</Text> : null}
+      {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <Text style={styles.note}>
         Finish today's puzzle and we'll record your result against this challenge automatically.
@@ -177,5 +202,11 @@ const styles = StyleSheet.create({
   buttonText: { color: colors.textInverse, fontWeight: '700', fontSize: fontSize.md },
   buttonSecondaryText: { color: colors.text, fontWeight: '700', fontSize: fontSize.md },
   buttonDisabled: { opacity: 0.6 },
+  error: {
+    backgroundColor: colors.warningMuted,
+    borderRadius: radius.md,
+    color: colors.warning,
+    padding: spacing.sm,
+  },
   note: { fontSize: fontSize.xs, color: colors.textMuted, marginTop: spacing.md },
 });

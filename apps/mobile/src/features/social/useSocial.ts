@@ -102,3 +102,13 @@ export function useResolveChallenge(code: string | null) {
     staleTime: 30_000,
   });
 }
+
+export function useChallengeDetail(challengeId: string, enabled = true) {
+  const { authCtx } = useAuth();
+  return useQuery<ChallengeDetailDTO>({
+    queryKey: ['challenges', challengeId],
+    enabled: enabled && challengeId.trim().length > 0,
+    queryFn: () => sdk.getChallenge(challengeId, authCtx),
+    staleTime: 30_000,
+  });
+}

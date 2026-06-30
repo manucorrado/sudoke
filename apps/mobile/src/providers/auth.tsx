@@ -34,6 +34,25 @@ interface AuthProviderProps {
   readonly children: ReactNode;
 }
 
+const attemptedGuestClaims = new Set<string>();
+
+async function claimGuestIfAvailable(
+  bearer: string,
+  guestToken: string | null,
+): Promise<string | null> {
+  if (!guestToken) return null;
+  if (attemptedGuestClaims.has(guestToken)) return guestToken;
+  attemptedGuestClaims.add(guestToken);
+  try {
+    await sdk.claimGuest({ bearer, guestToken });
+    await appStorage.remove(GUEST_TOKEN_KEY);
+    return null;
+  } catch (err) {
+    console.warn('Guest result claim failed; continuing sign-in.', err);
+    return guestToken;
+  }
+}
+
 /**
  * Guest-first auth provider.
  *
@@ -65,11 +84,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (!prev.bearer) return { ...prev, me: null };
       return prev;
     });
-    const bearer = await secureStorage.get(BEARER_KEY);
+    const [bearer, storedGuestToken] = await Promise.all([
+      secureStorage.get(BEARER_KEY),
+      appStorage.get(GUEST_TOKEN_KEY),
+    ]);
     if (!bearer) return;
     try {
+      const guestToken = await claimGuestIfAvailable(bearer, storedGuestToken);
       const me = await sdk.getMe({ bearer });
-      setState((prev) => ({ ...prev, me, status: 'authenticated' }));
+      setState((prev) => ({
+        ...prev,
+        bearer,
+        guestToken,
+        me,
+        status: 'authenticated',
+      }));
     } catch {
       // bearer is stale — fall back to guest if we have one
       await secureStorage.remove(BEARER_KEY);
@@ -128,8 +157,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
       });
       if (bearer) {
         try {
+          const claimedGuestToken = await claimGuestIfAvailable(
+            bearer,
+            guestToken,
+          );
           const me = await sdk.getMe({ bearer });
-          if (!cancelled) setState((prev) => ({ ...prev, me }));
+          if (!cancelled) {
+            setState((prev) => ({
+              ...prev,
+              guestToken: claimedGuestToken,
+              me,
+              status: 'authenticated',
+            }));
+          }
         } catch {
           if (!cancelled) {
             await secureStorage.remove(BEARER_KEY);

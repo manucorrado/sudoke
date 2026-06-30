@@ -1,20 +1,17 @@
 /**
  * Sign-in / Create account screen (PRD §4, §5).
  *
- * Today this screen offers two paths:
- *   1. Dev bearer paste — for backend testing and CI flows. Always available.
- *   2. Clerk sign-in placeholder — rendered when
- *      `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` is set. The actual `<SignIn>`
- *      component from `@clerk/clerk-expo` will be mounted here when keys
- *      are provisioned (see `providers/clerk-bridge.tsx`).
+ * This screen is guest-first. When Clerk is configured it starts a real
+ * Clerk SSO flow; otherwise local development keeps the bearer paste flow.
  *
- * On successful sign-in we kick `/me` and route the player back to the
- * Today tab.
+ * On successful Clerk sign-in, the provider bridge hydrates `/me` and this
+ * screen routes the player back to the Today tab.
  */
 
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSSO } from '@clerk/clerk-expo';
 import { useAuth } from '@/providers/auth';
 import { isClerkConfigured } from '@/providers/clerk-bridge';
 import { colors, fontSize, radius, spacing } from '@/theme/tokens';
@@ -25,6 +22,7 @@ export function SignInScreen() {
   const [token, setToken] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const clerkConfigured = isClerkConfigured();
 
   async function applyBearer() {
     setError(null);
@@ -69,16 +67,8 @@ export function SignInScreen() {
         Sign in to be on the leaderboard, keep a streak, and add friends.
       </Text>
 
-      {isClerkConfigured() ? (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>With Clerk</Text>
-          <View style={styles.placeholder}>
-            <Text style={styles.placeholderTitle}>Sign-in UI coming up</Text>
-            <Text style={styles.placeholderText}>
-              Clerk is configured. The hosted sign-in / sign-up flow will mount here.
-            </Text>
-          </View>
-        </View>
+      {clerkConfigured ? (
+        <ClerkSignInSection />
       ) : (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Hosted sign-in</Text>
@@ -93,30 +83,33 @@ export function SignInScreen() {
         </View>
       )}
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Dev token</Text>
-        <Text style={styles.help}>
-          Paste a Clerk-compatible JWT (or any token with a <Text style={styles.code}>sub</Text>
-          {' '}claim in development) to sign in against the API.
-        </Text>
-        <TextInput
-          value={token}
-          onChangeText={setToken}
-          placeholder="paste bearer token"
-          autoCapitalize="none"
-          autoCorrect={false}
-          multiline
-          style={styles.input}
-          accessibilityLabel="Bearer token"
-        />
-        <Pressable
-          style={[styles.button, styles.buttonPrimary, busy && styles.buttonDisabled]}
-          onPress={applyBearer}
-          disabled={busy}
-        >
-          <Text style={styles.buttonPrimaryText}>{busy ? 'Signing in…' : 'Sign in'}</Text>
-        </Pressable>
-      </View>
+      {!clerkConfigured ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Dev token</Text>
+          <Text style={styles.help}>
+            Paste a Clerk-compatible JWT (or any token with a{' '}
+            <Text style={styles.code}>sub</Text> claim in development) to sign in against the
+            API.
+          </Text>
+          <TextInput
+            value={token}
+            onChangeText={setToken}
+            placeholder="paste bearer token"
+            autoCapitalize="none"
+            autoCorrect={false}
+            multiline
+            style={styles.input}
+            accessibilityLabel="Bearer token"
+          />
+          <Pressable
+            style={[styles.button, styles.buttonPrimary, busy && styles.buttonDisabled]}
+            onPress={applyBearer}
+            disabled={busy}
+          >
+            <Text style={styles.buttonPrimaryText}>{busy ? 'Signing in…' : 'Sign in'}</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       {status !== 'guest' && status !== 'authenticated' ? (
         <Pressable style={[styles.button, styles.buttonGhost]} onPress={continueAsGuest}>
@@ -130,6 +123,52 @@ export function SignInScreen() {
 }
 
 export default SignInScreen;
+
+function ClerkSignInSection() {
+  const router = useRouter();
+  const { startSSOFlow } = useSSO();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function signInWithGoogle() {
+    setError(null);
+    setBusy(true);
+    try {
+      const { createdSessionId, setActive } = await startSSOFlow({
+        strategy: 'oauth_google',
+      });
+      if (!createdSessionId || !setActive) {
+        setError('Clerk did not create a session. Try again.');
+        return;
+      }
+      await setActive({ session: createdSessionId });
+      router.replace('/');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Clerk sign-in failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>With Clerk</Text>
+      <Text style={styles.help}>
+        Continue with Clerk to save ranked results, friends, streaks, and challenge claims.
+      </Text>
+      <Pressable
+        style={[styles.button, styles.buttonPrimary, busy && styles.buttonDisabled]}
+        onPress={signInWithGoogle}
+        disabled={busy}
+      >
+        <Text style={styles.buttonPrimaryText}>
+          {busy ? 'Opening Clerk…' : 'Continue with Google'}
+        </Text>
+      </Pressable>
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
   container: { padding: spacing.lg, backgroundColor: colors.bg, gap: spacing.md, flexGrow: 1 },

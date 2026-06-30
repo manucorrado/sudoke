@@ -239,6 +239,8 @@ flowchart TD
 
 **Depends on:** Epic 2, Epic 3
 
+**Implementation plan (challenge loop):** [docs/plans/epic-6-challenge-loop.md](docs/plans/epic-6-challenge-loop.md) — phased work to close share → play → compare. See also [EPIC_PLAN_UPDATED.md](EPIC_PLAN_UPDATED.md) for current audit status.
+
 ### Deliverables
 
 | Area | Scope |
@@ -254,11 +256,11 @@ flowchart TD
 
 ### Exit Criteria
 
-- [ ] User can share challenge link after ranked completion
-- [ ] Guest recipient completes challenge and sees time comparison
-- [ ] Guest can sign up and permanently claim result
-- [ ] Username search and friend requests work end-to-end
-- [ ] Challenge context preserved through install/open deep link path
+- [x] User can share challenge link after ranked completion — Social tab + API; post-game Today CTA planned in [challenge loop plan](docs/plans/epic-6-challenge-loop.md) Phase 1
+- [ ] Guest recipient completes challenge and sees time comparison — [challenge loop plan](docs/plans/epic-6-challenge-loop.md) Phases 2–4
+- [ ] Guest can sign up and permanently claim result — out of scope for challenge-loop plan
+- [x] Username search and friend requests work end-to-end
+- [x] Challenge context preserved through install/open deep link path
 
 ---
 
@@ -457,7 +459,7 @@ Before public launch, confirm:
 
 1. ≥90 approved puzzles scheduled (Epic 5)
 2. Stable ranked lifecycle and rating jobs for 7+ days (Epic 3, 4)
-3. Challenge links work install → play → claim (Epic 6)
+3. Challenge links work install → play → compare → claim (Epic 6 — [challenge loop plan](docs/plans/epic-6-challenge-loop.md) + guest claim)
 4. All §34 acceptance criteria green
 5. Privacy/legal live with account deletion (Epic 10)
 6. AdMob validated without ranked disruption (Epic 9)

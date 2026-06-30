@@ -59,5 +59,6 @@ export const StorageKeys = {
   bearer: "sudoke:auth_token",
   onboardingCompletedAt: "sudoke:onboarding_completed_at",
   pendingChallengeCode: "sudoke:pending_challenge_code",
+  pendingChallengeId: "sudoke:pending_challenge_id",
   notificationPrefs: "sudoke:notification_prefs",
 } as const;

@@ -1,3 +1,30 @@
+# Render Blueprint for the staging stack.
+#
+# This file is repo-side configuration only. Creating/linking the actual
+# Render services, secrets, custom domains, and production stack remains a
+# manual launch task.
+
+databases:
+  - name: sudoke-postgres-staging
+    plan: basic-1gb
+    ipAllowList: []
+
+services:
+  - type: keyvalue
+    name: sudoke-redis-staging
+    plan: starter
+    ipAllowList: []
+
+  - type: web
+    name: sudoke-api-staging
+    runtime: docker
+    branch: main
+    dockerContext: ./apps/api
+    dockerfilePath: ./apps/api/Dockerfile
+    healthCheckPath: /api/v1/health/ready
+    startCommand: uvicorn src.main:app --host 0.0.0.0 --port $PORT
+    releaseCommand: alembic upgrade head
+    envVars:
 # Render Blueprint — Sudoke staging compute services.
 #
 # Hybrid provisioning model (see INFRA_EPICS.md):
@@ -33,6 +60,27 @@ services:
         value: staging
       - key: API_V1_PREFIX
         value: /api/v1
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sudoke-postgres-staging
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: sudoke-redis-staging
+          property: connectionString
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: CHALLENGE_SHARE_BASE_URL
+        value: https://staging.sudoke.app/c
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: CLERK_ISSUER
+        sync: false
+      - key: CLERK_JWKS_URL
+        sync: false
+      - key: CLERK_JWT_AUDIENCE
+        sync: false
       # Temporary: lets the admin dashboard authenticate via the
       # X-Dev-Auth-User bypass until Clerk is wired (INFRA_EPICS I6).
       - key: ADMIN_DEV_BYPASS_ENABLED
@@ -48,6 +96,27 @@ services:
   - type: cron
     name: sudoke-cron-staging
     runtime: docker
+    branch: main
+    dockerContext: ./apps/api
+    dockerfilePath: ./apps/api/Dockerfile
+    schedule: "* * * * *"
+    startCommand: python -m src.jobs.worker tick
+    envVars:
+      - key: ENVIRONMENT
+        value: staging
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sudoke-postgres-staging
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: sudoke-redis-staging
+          property: connectionString
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: CLERK_ISSUER
+        sync: false
     region: oregon
     plan: starter
     branch: main
@@ -68,6 +137,21 @@ services:
 
   - type: web
     name: sudoke-admin-staging
+    runtime: node
+    branch: main
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @sudoke/admin build
+    startCommand: pnpm --filter @sudoke/admin start -- -p $PORT
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: API_BASE_URL
+        sync: false
+      - key: ADMIN_API_BEARER
+        sync: false
+      - key: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
     runtime: docker
     region: oregon
     plan: starter

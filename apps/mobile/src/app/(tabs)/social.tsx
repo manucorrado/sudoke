@@ -12,6 +12,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/providers/auth';
 import {
+  useChallengeDetail,
   useCreateChallenge,
   useFriendActions,
   useFriendRequests,
@@ -350,7 +351,12 @@ function ChallengesTab() {
           <Text style={styles.muted}>You haven't sent any active challenges yet.</Text>
         ) : (
           sent.map((c) => (
-            <ChallengeRow key={c.id} challenge={c} onShare={() => handleShare(c)} />
+            <ChallengeRow
+              key={c.id}
+              challenge={c}
+              onShare={() => handleShare(c)}
+              showAcceptances
+            />
           ))
         )}
       </View>
@@ -358,7 +364,9 @@ function ChallengesTab() {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Received ({received.length})</Text>
         {received.length === 0 ? (
-          <Text style={styles.muted}>No active challenges from friends.</Text>
+          <Text style={styles.muted}>
+            Received challenges appear here after you finish through a shared link.
+          </Text>
         ) : (
           received.map((c) => (
             <ChallengeRow key={c.id} challenge={c} onShare={() => handleShare(c)} />
@@ -372,10 +380,16 @@ function ChallengesTab() {
 function ChallengeRow({
   challenge,
   onShare,
+  showAcceptances = false,
 }: {
   readonly challenge: ChallengeDTO;
   readonly onShare: () => void;
+  readonly showAcceptances?: boolean;
 }) {
+  const detail = useChallengeDetail(challenge.id, showAcceptances);
+  const acceptances = detail.data?.acceptances ?? [];
+  const completedAcceptances = acceptances.filter((a) => a.duration_ms !== null);
+  const latestAcceptance = completedAcceptances[completedAcceptances.length - 1];
   return (
     <View style={styles.row}>
       <View style={{ flex: 1 }}>
@@ -388,6 +402,17 @@ function ChallengeRow({
             ? ` · ${formatDuration(challenge.challenger_duration_ms)}`
             : ' · result pending'}
         </Text>
+        {showAcceptances ? (
+          <Text style={styles.muted}>
+            {detail.isLoading
+              ? 'Loading acceptances…'
+              : `${acceptances.length} accepted${
+                  typeof latestAcceptance?.duration_ms === 'number'
+                    ? ` · latest ${formatDuration(latestAcceptance.duration_ms)}`
+                    : ''
+                }`}
+          </Text>
+        ) : null}
       </View>
       <Pressable style={styles.smallButton} onPress={onShare}>
         <Text style={styles.smallButtonText}>Share</Text>

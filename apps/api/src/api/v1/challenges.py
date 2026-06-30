@@ -23,6 +23,7 @@ from src.middleware.principal import Principal, require_principal, require_user
 from src.models import (
     Challenge,
     DailyPuzzle,
+    GuestSession,
     RankedAttempt,
     User,
 )
@@ -69,6 +70,31 @@ async def _challenger_attempt(
         .where(RankedAttempt.daily_puzzle_id == daily_id)
     )
     return (await session.execute(stmt)).scalar_one_or_none()
+
+
+async def _recipient_attempt(
+    session: AsyncSession,
+    *,
+    user: User | None,
+    guest: GuestSession | None,
+    daily_id: uuid.UUID,
+) -> RankedAttempt | None:
+    base_stmt = select(RankedAttempt)
+    if user is not None:
+        base_stmt = base_stmt.where(RankedAttempt.user_id == user.id)
+    elif guest is not None:
+        base_stmt = base_stmt.where(RankedAttempt.guest_session_id == guest.id)
+    else:
+        return None
+    exact_stmt = (
+        base_stmt.where(RankedAttempt.daily_puzzle_id == daily_id)
+        .order_by(RankedAttempt.created_at.desc())
+    )
+    exact = (await session.execute(exact_stmt)).scalars().first()
+    if exact is not None:
+        return exact
+    latest_stmt = base_stmt.order_by(RankedAttempt.created_at.desc())
+    return (await session.execute(latest_stmt)).scalars().first()
 
 
 async def _user_by_id(
@@ -167,11 +193,12 @@ async def post_result(
     challenge = await get_challenge(session, challenge_id)
     if challenge is None:
         raise HTTPException(status_code=404, detail="Challenge not found")
-    attempt = None
-    if principal.user is not None:
-        attempt = await _challenger_attempt(
-            session, user=principal.user, daily_id=challenge.daily_puzzle_id
-        )
+    attempt = await _recipient_attempt(
+        session,
+        user=principal.user,
+        guest=principal.guest,
+        daily_id=challenge.daily_puzzle_id,
+    )
     try:
         acceptance = await record_acceptance(
             session,

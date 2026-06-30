@@ -13,6 +13,7 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models import (
+    AttemptStatus,
     Challenge,
     ChallengeAcceptance,
     ChallengeStatus,
@@ -27,6 +28,14 @@ from src.models import (
 CHALLENGE_CODE_ALPHABET = string.ascii_uppercase + string.digits
 CHALLENGE_CODE_LENGTH = 8
 CHALLENGE_EXPIRY_HOURS = 48
+SUCCESSFUL_CHALLENGE_STATUSES: frozenset[AttemptStatus] = frozenset(
+    {
+        AttemptStatus.validated,
+        AttemptStatus.provisional_ranked,
+        AttemptStatus.finalized,
+        AttemptStatus.under_review,
+    }
+)
 
 Relationship = Literal[
     "self", "friends", "request_sent", "request_received", "none"
@@ -414,6 +423,14 @@ async def list_acceptances(
     return list((await session.execute(stmt)).scalars())
 
 
+def _as_aware_utc(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value
+
+
 async def record_acceptance(
     session: AsyncSession,
     *,
@@ -427,6 +444,55 @@ async def record_acceptance(
     One row per (challenge, recipient) — re-submissions update in place.
     """
 
+    if user is None and guest is None:
+        raise SocialError(
+            "auth_required",
+            "Sign in or play as guest to accept this challenge",
+            http_status=401,
+        )
+
+    now = datetime.now(timezone.utc)
+    expires_at = _as_aware_utc(challenge.expires_at)
+    if challenge.status != ChallengeStatus.active or (
+        expires_at is not None and expires_at <= now
+    ):
+        raise SocialError(
+            "challenge_expired",
+            "This challenge is no longer active",
+            http_status=409,
+        )
+
+    if user is not None and user.id == challenge.challenger_user_id:
+        raise SocialError(
+            "self_challenge",
+            "You cannot accept your own challenge",
+            http_status=400,
+        )
+
+    if attempt is None:
+        raise SocialError(
+            "attempt_not_complete",
+            "Complete today's ranked puzzle before recording this challenge",
+            http_status=400,
+        )
+
+    if attempt.daily_puzzle_id != challenge.daily_puzzle_id:
+        raise SocialError(
+            "daily_mismatch",
+            "This result is for a different daily puzzle",
+            http_status=409,
+        )
+
+    if (
+        attempt.status not in SUCCESSFUL_CHALLENGE_STATUSES
+        or attempt.official_duration_ms is None
+    ):
+        raise SocialError(
+            "attempt_not_complete",
+            "Complete today's ranked puzzle before recording this challenge",
+            http_status=400,
+        )
+
     stmt = select(ChallengeAcceptance).where(
         ChallengeAcceptance.challenge_id == challenge.id
     )
@@ -435,12 +501,6 @@ async def record_acceptance(
     elif guest is not None:
         stmt = stmt.where(
             ChallengeAcceptance.recipient_guest_id == guest.id
-        )
-    else:
-        raise SocialError(
-            "auth_required",
-            "Sign in or play as guest to accept this challenge",
-            http_status=401,
         )
 
     existing = (await session.execute(stmt)).scalars().first()
