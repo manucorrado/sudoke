@@ -23,7 +23,6 @@ class Settings(BaseSettings):
     CLERK_WEBHOOK_SIGNING_SECRET: str | None = None
     ENVIRONMENT: str = "development"
     API_V1_PREFIX: str = "/api/v1"
-    CORS_ALLOWED_ORIGINS: str = ""
     POSTHOG_API_KEY: str | None = None
     POSTHOG_HOST: str | None = None
     EXPO_ACCESS_TOKEN: str | None = None
@@ -51,28 +50,6 @@ class Settings(BaseSettings):
             return value.replace("postgres://", "postgresql+asyncpg://", 1)
         if value.startswith("postgresql://"):
             return value.replace("postgresql://", "postgresql+asyncpg://", 1)
-    def _normalize_database_url(cls, value: str) -> str:
-        """Coerce managed Postgres URLs to the asyncpg driver.
-
-        Render exposes connection strings as ``postgres://`` or
-        ``postgresql://`` without a driver suffix, but the SQLAlchemy async
-        engine requires ``postgresql+asyncpg://``. Other schemes (sqlite,
-        already-qualified asyncpg URLs) are left untouched.
-        """
-        import sys
-
-        scheme = value.split("://")[0] if "://" in value else "(no scheme)"
-        print(
-            f"DATABASE_URL diagnostic: scheme={scheme!r}, "
-            f"len={len(value)}, has_at={'@' in value}, "
-            f"first_20={value[:20]!r}",
-            file=sys.stderr,
-        )
-
-        if value.startswith("postgres://"):
-            return "postgresql+asyncpg://" + value[len("postgres://") :]
-        if value.startswith("postgresql://"):
-            return "postgresql+asyncpg://" + value[len("postgresql://") :]
         return value
 
     @property
@@ -81,7 +58,6 @@ class Settings(BaseSettings):
 
     @property
     def cors_allowed_origins(self) -> list[str]:
-    def cors_origins(self) -> list[str]:
         if self.is_development:
             return ["*"]
         return [

@@ -16,8 +16,6 @@ function normalizeBaseUrl(value: string | undefined): string {
 }
 
 const BASE_URL = normalizeBaseUrl(env.EXPO_PUBLIC_API_BASE_URL);
-const BASE_URL =
-  process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
 
 interface RequestOptions extends Omit<RequestInit, "body"> {
   body?: unknown;
