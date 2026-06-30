@@ -5,7 +5,13 @@ import {
   type Puzzle,
   type PuzzleDifficulty,
 } from '@sudoke/sudoku-core';
-import { sdk, type ArchiveDetailDTO, type ArchiveListDTO, type UpcomingListDTO } from '@/lib/sdk';
+import {
+  sdk,
+  type ArchiveDetailDTO,
+  type ArchiveListDTO,
+  type ArchiveMyResultDTO,
+  type UpcomingListDTO,
+} from '@/lib/sdk';
 import { useAuth } from '@/providers/auth';
 
 export function useArchiveList(opts: { limit?: number } = {}) {
@@ -32,6 +38,21 @@ export function useArchiveDetail(dailyPuzzleId: string | null) {
     queryKey: ['archive', 'detail', dailyPuzzleId],
     enabled: dailyPuzzleId !== null,
     queryFn: () => sdk.getArchiveDetail(dailyPuzzleId!, authCtx),
+    staleTime: 5 * 60_000,
+  });
+}
+
+/**
+ * The signed-in player's original ranked result for a closed daily.
+ * Disabled for guests (only registered accounts have ranked history).
+ */
+export function useArchiveMyResult(dailyPuzzleId: string | null) {
+  const { authCtx, status } = useAuth();
+  return useQuery<ArchiveMyResultDTO>({
+    queryKey: ['archive', 'my-result', dailyPuzzleId],
+    enabled: dailyPuzzleId !== null && status === 'authenticated',
+    queryFn: () => sdk.getArchiveMyResult(dailyPuzzleId!, authCtx),
+    retry: false,
     staleTime: 5 * 60_000,
   });
 }

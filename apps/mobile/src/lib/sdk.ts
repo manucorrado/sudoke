@@ -294,9 +294,34 @@ export const sdk = {
     });
   },
 
+  async getArchiveMyResult(
+    dailyId: string,
+    ctx: AuthContext,
+  ): Promise<ArchiveMyResultDTO> {
+    return api.get<ArchiveMyResultDTO>(`/archive/${dailyId}/my-result`, {
+      headers: headersFor(ctx),
+    });
+  },
+
   // ---- Epic 8: streak + notification preferences ----
   async getMyStreak(ctx: AuthContext): Promise<StreakDTO> {
     return api.get<StreakDTO>('/me/streak', { headers: headersFor(ctx) });
+  },
+
+  async registerPushToken(
+    payload: { token: string; platform: PushPlatform },
+    ctx: AuthContext,
+  ): Promise<PushTokenDTO> {
+    return api.post<PushTokenDTO>('/me/push-tokens', payload, {
+      headers: headersFor(ctx),
+    });
+  },
+
+  async unregisterPushToken(token: string, ctx: AuthContext): Promise<void> {
+    return api.delete<void>(
+      `/me/push-tokens?token=${encodeURIComponent(token)}`,
+      { headers: headersFor(ctx) },
+    );
   },
 
   async getNotificationPreferences(
@@ -477,6 +502,12 @@ export interface GhostRankDTO {
   readonly is_official: boolean;
 }
 
+export interface ArchiveMyResultDTO {
+  readonly daily_puzzle_id: string;
+  readonly played: boolean;
+  readonly result: MyResultDTO | null;
+}
+
 // ---- Epic 8 DTOs ----
 
 export interface StreakDTO {
@@ -494,6 +525,13 @@ export interface NotificationPreferencesDTO {
   readonly friend_challenged_you: boolean;
   readonly beat_your_time: boolean;
   readonly final_ranking_ready: boolean;
+}
+
+export type PushPlatform = 'ios' | 'android' | 'web';
+
+export interface PushTokenDTO {
+  readonly token: string;
+  readonly platform: string;
 }
 
 // ---- Epic 6 DTOs ----

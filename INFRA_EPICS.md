@@ -35,10 +35,10 @@ This document turns those gaps into ordered **Infrastructure Epics (I0–I12)** 
 | Domains / universal links | ❌ | `app.json` has `scheme: sudoke` only; no `associatedDomains` |
 | Challenge web landing | ❌ | PRD §5.2 requires non-playable web card; only in-app stub |
 | PostHog | ❌ | PRD §29 |
-| Push notifications infra | ❌ | PRD §19; `expo-notifications` not installed |
+| Push notifications infra | ⚠️ partial | Server-side device registry (`push_tokens`) + preference-aware Expo dispatch landed (gated by `EXPO_PUSH_ENABLED`, off by default); native `expo-notifications` + APNs/FCM creds pending (PRD §19) |
 | AdMob infra | ❌ | PRD §20 |
 | Playwright CI | ❌ | Epic 3 exit criteria; not in CI |
-| DB tables for future epics | ❌ partial | Missing friendships, challenges, notifications, streaks, ads, analytics per PRD §27 |
+| DB tables for future epics | ⚠️ partial | `friend_requests`, `challenges`, `user_streaks`, `notification_preferences`, and `push_tokens` now exist (Epics 6/8); ads + analytics tables remain per PRD §27 |
 | Puzzle content in cloud DB | ❌ | Local bank under `data/` (gitignored); not loaded to any environment |
 | Production CORS | ⚠️ env-backed | `CORS_ALLOWED_ORIGINS` supported; staging/prod values must be set |
 | Backups / PITR / job alerts | ❌ | Not configured |
@@ -129,9 +129,10 @@ flowchart TB
 | `ADMIN_DEV_BYPASS_ENABLED` | Never in prod | Literal `false` | Guard `X-Dev-Auth-User` (currently dev-only) |
 | `DAILY_RESET_UTC_HOUR` | Optional | App config / `app_config` table | If not DB-driven |
 | `EXPO_ACCESS_TOKEN` | Epic 8 | Expo account | Sending push via Expo Push API from API |
+| `EXPO_PUSH_ENABLED` | Epic 8 | Literal `false` until creds | Master switch for server-side push dispatch; off = safe no-op |
 | `CRON_SECRET` | Optional | `generateValue: true` | If cron invoked via HTTP instead of CLI |
 
-**Repo-side status:** API env examples now include `CORS_ALLOWED_ORIGINS`, Clerk issuer/JWKS/webhook placeholders, `POSTHOG_*`, and `EXPO_ACCESS_TOKEN`. Real staging/prod values remain manual secrets.
+**Repo-side status:** API env examples now include `CORS_ALLOWED_ORIGINS`, Clerk issuer/JWKS/webhook placeholders, `POSTHOG_*`, `EXPO_ACCESS_TOKEN`, and `EXPO_PUSH_ENABLED`. Real staging/prod values remain manual secrets.
 
 ### Admin (`apps/admin`) — Render Web Service
 
@@ -217,7 +218,7 @@ flowchart TB
 | App link (Android) | Mobile app | HTTPS → app | `/.well-known/assetlinks.json` | ❌ | Same host |
 | Custom scheme fallback | Mobile app | `sudoke://c/{code}` | ✅ stub in app | ⚠️ | Needs store listing + intent filters in `app.json` |
 | Clerk | API | HTTPS webhook | `POST /api/v1/webhooks/clerk` | ❌ | Endpoint not implemented |
-| API | Expo Push API | HTTPS | Push dispatch | ❌ | Epic 8 |
+| API | Expo Push API | HTTPS | Push dispatch | ⚠️ | Dispatch service implemented (`services/notifications.py`), gated by `EXPO_PUSH_ENABLED`; needs creds + native client |
 | Mobile | PostHog / Sentry / AdMob | HTTPS | Third-party SDKs | ❌ | Epic 9–10 |
 
 ### CORS (Production Gap)
@@ -243,7 +244,7 @@ Production/staging CORS is now env-backed. Before any Expo Web or admin browser 
 | API (uvicorn) | 8000 local / **10000** Render default | Set `PORT=10000` or read `$PORT` in start command |
 | Admin (Next.js) | 3001 local / **10000** Render | `next start -p $PORT` |
 
-**Gap:** API Dockerfile exposes 8000 and does not read `$PORT` — must fix for Render.
+**Resolved:** API Dockerfile reads `$PORT` (`CMD … --port ${PORT:-8000}`); Render injects `PORT=10000` and live `sudoke-api-staging` `/api/v1/health/ready` returns `200`. Admin runs via its own Docker image on port 10000.
 
 ---
 
@@ -520,20 +521,21 @@ Epics are ordered by dependency. **I0–I3** unblock staging; **I4–I8** align 
 | Mobile | `expo-notifications` plugin; permission gating per PRD |
 | EAS credentials | APNs key (iOS), FCM v1 service account (Android) |
 | Firebase project | `google-services.json` for Android |
-| API endpoints | `POST /notifications/register-device`, preferences (PRD §28.8) |
-| DB tables | `notification_preferences`, `notification_events`, device tokens |
-| Dispatch | API → Expo Push API (or direct FCM/APNs later) |
-| Cron/Worker | Batch sends for daily reminder, final ranking ready |
+| API endpoints | ✅ `POST`/`DELETE /me/push-tokens` (device registry) + `GET`/`PATCH /me/notifications/preferences` (PRD §28.8) |
+| DB tables | ✅ `notification_preferences`, ✅ `push_tokens` (device tokens); `notification_events` not yet needed |
+| Dispatch | ✅ `services/notifications.py` — preference-aware, batched Expo Push, gated by `EXPO_PUSH_ENABLED` |
+| Cron/Worker | ⚠️ best-effort "final ranking ready" fired from finalize cron; daily reminder still TODO |
 
 #### Secrets
 
 - EAS: APNs `.p8`, FCM service account JSON
-- API: `EXPO_ACCESS_TOKEN` (if using Expo Push server-side)
+- API: `EXPO_PUSH_ENABLED=true` to turn on dispatch; `EXPO_ACCESS_TOKEN` for authenticated Expo Push sends
 
 #### Exit criteria
 
-- [ ] Test push delivered on iOS + Android staging builds
-- [ ] Device token persisted and associated with user
+- [ ] Test push delivered on iOS + Android staging builds (needs native client + creds)
+- [x] Device token persisted and associated with user — `push_tokens` + `POST`/`DELETE /me/push-tokens` (idempotent upsert)
+- [x] Server-side dispatch path implemented — preference-aware `dispatch_to_users()`, gated off by default; finalize cron fires "final ranking ready"
 - [ ] Push permission not shown during onboarding (product rule)
 
 ---

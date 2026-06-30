@@ -17,9 +17,11 @@ from src.models import (
     User,
     UserRole,
 )
+from src.middleware.auth import AuthenticatedUser
 from src.models.puzzles import DailyPuzzleStatus, PuzzleDifficulty
 from src.services.rating import finalize_daily_ratings
 from src.sudoku.engine import parse_grid, serialize_grid, solve
+from tests.conftest import auth_headers, login_as
 
 EASY = (
     "530070000"
@@ -211,3 +213,90 @@ async def test_upcoming_lists_only_future(
     assert entry["difficulty"] == "hard"
     # No givens, no solution
     assert "givens" not in entry
+
+
+@pytest.mark.asyncio
+async def test_archive_my_result_returns_original_result(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    """A user who played the daily sees their finalized result in archive."""
+
+    daily, users = await _seed(db_session, days_ago=3, n_results=3)
+    me = users[0]  # fastest cohort time -> rank 1
+    login_as(client, AuthenticatedUser(user_id=me.auth_provider_id, email=me.email))
+
+    res = await client.get(
+        f"/api/v1/archive/{daily.id}/my-result", headers=auth_headers()
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["played"] is True
+    assert body["daily_puzzle_id"] == str(daily.id)
+    assert body["result"]["rank"] == 1
+    assert body["result"]["is_final"] is True
+    assert body["result"]["cohort_size"] == 3
+
+
+@pytest.mark.asyncio
+async def test_archive_my_result_not_played_returns_null(
+    client: AsyncClient, db_session: AsyncSession, player_user: User
+) -> None:
+    """A user who never attempted the daily gets played=False (not a 404)."""
+
+    daily, _ = await _seed(db_session, days_ago=2, n_results=2)
+    login_as(
+        client,
+        AuthenticatedUser(
+            user_id=player_user.auth_provider_id, email=player_user.email
+        ),
+    )
+
+    res = await client.get(
+        f"/api/v1/archive/{daily.id}/my-result", headers=auth_headers()
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["played"] is False
+    assert body["result"] is None
+
+
+@pytest.mark.asyncio
+async def test_archive_my_result_open_daily_404(
+    client: AsyncClient, db_session: AsyncSession, player_user: User
+) -> None:
+    """An open (non-closed) daily is not an archive entry -> 404."""
+
+    puzzle = Puzzle(
+        givens=EASY,
+        solution=EASY_SOL,
+        difficulty=PuzzleDifficulty.easy,
+        status=PuzzleStatus.approved,
+        estimated_min_seconds=240,
+        estimated_max_seconds=600,
+        clue_count=30,
+        source="m",
+        license="CC0",
+    )
+    db_session.add(puzzle)
+    await db_session.flush()
+    now = datetime.now(timezone.utc)
+    daily = DailyPuzzle(
+        puzzle_id=puzzle.id,
+        scheduled_for=date.today(),
+        activate_at=now - timedelta(hours=1),
+        finalize_at=now + timedelta(hours=20),
+        status=DailyPuzzleStatus.active,
+    )
+    db_session.add(daily)
+    await db_session.commit()
+
+    login_as(
+        client,
+        AuthenticatedUser(
+            user_id=player_user.auth_provider_id, email=player_user.email
+        ),
+    )
+    res = await client.get(
+        f"/api/v1/archive/{daily.id}/my-result", headers=auth_headers()
+    )
+    assert res.status_code == 404

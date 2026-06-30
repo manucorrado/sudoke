@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -264,6 +265,16 @@ class UpdateNotificationPreferencesRequest(BaseModel):
     final_ranking_ready: bool | None = None
 
 
+class RegisterPushTokenRequest(BaseModel):
+    token: str = Field(min_length=1, max_length=256)
+    platform: Literal["ios", "android", "web"] = "ios"
+
+
+class PushTokenPublic(APIModel):
+    token: str
+    platform: str
+
+
 # ---- Epic 7 — Archive / practice ----------------------------------------
 
 
@@ -291,6 +302,18 @@ class ArchiveDetailPublic(APIModel):
     givens: str
     solution: str
     is_final: bool
+
+
+class ArchiveMyResultPublic(BaseModel):
+    """The caller's original ranked result for a closed daily (PRD §12).
+
+    `played=False` (and `result=None`) when the caller never made a ranked
+    attempt for this daily — the archive UI shows the historical board only.
+    """
+
+    daily_puzzle_id: uuid.UUID
+    played: bool
+    result: MyResultPublic | None = None
 
 
 class UpcomingEntryPublic(APIModel):

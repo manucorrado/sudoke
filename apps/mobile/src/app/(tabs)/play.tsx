@@ -13,6 +13,7 @@ import {
 } from '@sudoke/sudoku-core';
 import { GameScreen } from '@/features/game/GameScreen';
 import { ArchiveReplayCard } from '@/features/archive/ArchiveReplayCard';
+import { ArchiveResultCard } from '@/features/archive/ArchiveResultCard';
 import {
   puzzleFromArchive,
   useArchiveDetail,
@@ -54,20 +55,31 @@ export function PlayScreen() {
   });
   const [active, setActive] = useState<CreateGameInput | null>(null);
   const [activeArchive, setActiveArchive] = useState<ActiveArchive | null>(null);
+  const [archiveReplaying, setArchiveReplaying] = useState(false);
 
   const puzzle = useMemo(
     () => FIXTURE_PUZZLES.find((p) => p.metadata.difficulty === difficulty) ?? FIXTURE_PUZZLES[0]!,
     [difficulty],
   );
 
-  if (activeArchive) {
+  if (activeArchive && archiveReplaying) {
     return (
       <View style={styles.gameWrap}>
-        <Pressable onPress={() => setActiveArchive(null)} style={styles.backButton}>
-          <Text style={styles.backText}>← Back to Play</Text>
+        <Pressable onPress={() => setArchiveReplaying(false)} style={styles.backButton}>
+          <Text style={styles.backText}>← Back to results</Text>
         </Pressable>
         <ArchiveReplayLoader entry={activeArchive} />
       </View>
+    );
+  }
+
+  if (activeArchive) {
+    return (
+      <ArchiveDetailView
+        entry={activeArchive}
+        onBack={() => setActiveArchive(null)}
+        onReplay={() => setArchiveReplaying(true)}
+      />
     );
   }
 
@@ -125,7 +137,12 @@ export function PlayScreen() {
           onStart={handleStart}
         />
       ) : tab === 'archive' ? (
-        <ArchiveList onPlay={setActiveArchive} />
+        <ArchiveList
+          onOpen={(entry) => {
+            setActiveArchive(entry);
+            setArchiveReplaying(false);
+          }}
+        />
       ) : (
         <UpcomingList />
       )}
@@ -227,11 +244,33 @@ function ArchiveReplayLoader({ entry }: ArchiveLoaderProps) {
   );
 }
 
-interface ArchiveListProps {
-  readonly onPlay: (entry: ActiveArchive) => void;
+interface ArchiveDetailViewProps {
+  readonly entry: ActiveArchive;
+  readonly onBack: () => void;
+  readonly onReplay: () => void;
 }
 
-function ArchiveList({ onPlay }: ArchiveListProps) {
+function ArchiveDetailView({ entry, onBack, onReplay }: ArchiveDetailViewProps) {
+  return (
+    <ScrollView contentContainerStyle={styles.container}>
+      <Pressable onPress={onBack} style={styles.detailBack} accessibilityRole="button">
+        <Text style={styles.backText}>← Back to Play</Text>
+      </Pressable>
+      <Text style={styles.title}>{formatDate(entry.scheduledFor)}</Text>
+      <Text style={styles.subtitle}>{capitalize(entry.difficulty)} · closed daily</Text>
+      <ArchiveResultCard dailyPuzzleId={entry.dailyPuzzleId} />
+      <Pressable style={styles.startButton} onPress={onReplay} accessibilityRole="button">
+        <Text style={styles.startButtonText}>Replay (practice)</Text>
+      </Pressable>
+    </ScrollView>
+  );
+}
+
+interface ArchiveListProps {
+  readonly onOpen: (entry: ActiveArchive) => void;
+}
+
+function ArchiveList({ onOpen }: ArchiveListProps) {
   const { data, isLoading, error, refetch, isRefetching } = useArchiveList({ limit: 30 });
   if (isLoading) return <Loading text="Loading archive…" />;
   if (error) {
@@ -262,7 +301,7 @@ function ArchiveList({ onPlay }: ArchiveListProps) {
           key={entry.daily_puzzle_id}
           style={styles.archiveRow}
           onPress={() =>
-            onPlay({
+            onOpen({
               dailyPuzzleId: entry.daily_puzzle_id,
               scheduledFor: entry.scheduled_for,
               difficulty: entry.difficulty as PuzzleDifficulty,
@@ -278,7 +317,7 @@ function ArchiveList({ onPlay }: ArchiveListProps) {
               {Math.round(entry.estimated_max_seconds / 60)} min
             </Text>
           </View>
-          <Text style={styles.archiveChevron}>Replay →</Text>
+          <Text style={styles.archiveChevron}>View →</Text>
         </Pressable>
       ))}
       {isRefetching ? <Text style={styles.note}>Refreshing…</Text> : null}
@@ -424,6 +463,7 @@ const styles = StyleSheet.create({
   container: { padding: spacing.lg, backgroundColor: colors.bg, gap: spacing.md },
   gameWrap: { flex: 1, backgroundColor: colors.bg },
   backButton: { padding: spacing.md },
+  detailBack: { alignSelf: 'flex-start', paddingVertical: spacing.xs },
   backText: { color: colors.primary, fontSize: fontSize.md, fontWeight: '600' },
   title: { fontSize: fontSize.xxl, fontWeight: '700', color: colors.text },
   subtitle: { fontSize: fontSize.sm, color: colors.textMuted, marginBottom: spacing.sm },

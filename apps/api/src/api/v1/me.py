@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db.session import get_db
@@ -10,10 +10,13 @@ from src.models import User
 from src.schemas.common import (
     MeResponse,
     NotificationPreferencesPublic,
+    PushTokenPublic,
+    RegisterPushTokenRequest,
     StreakPublic,
     UpdateNotificationPreferencesRequest,
     UpdateProfileRequest,
 )
+from src.services.notifications import register_push_token, remove_push_token
 from src.services.streaks import (
     MAX_FREEZES_HELD,
     get_or_create_notification_preferences,
@@ -119,3 +122,25 @@ async def patch_notification_preferences(
     for field, value in data.items():
         setattr(prefs, field, value)
     return NotificationPreferencesPublic.model_validate(prefs)
+
+
+@router.post("/push-tokens", response_model=PushTokenPublic)
+async def register_device_push_token(
+    payload: RegisterPushTokenRequest,
+    user: User = Depends(require_user),
+    session: AsyncSession = Depends(get_db),
+) -> PushTokenPublic:
+    token = await register_push_token(
+        session, user, token=payload.token, platform=payload.platform
+    )
+    return PushTokenPublic.model_validate(token)
+
+
+@router.delete("/push-tokens", status_code=status.HTTP_204_NO_CONTENT)
+async def unregister_device_push_token(
+    token: Annotated[str, Query(min_length=1, max_length=256)],
+    user: User = Depends(require_user),
+    session: AsyncSession = Depends(get_db),
+) -> Response:
+    await remove_push_token(session, user, token=token)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

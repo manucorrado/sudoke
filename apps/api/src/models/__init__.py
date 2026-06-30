@@ -12,6 +12,7 @@ from src.models.attempts import (
 )
 from src.models.audit import AdminAuditLog
 from src.models.guest import GuestSession
+from src.models.push import PushToken
 from src.models.puzzles import DailyPuzzle, DailyPuzzleStatus, Puzzle, PuzzleStatus
 from src.models.rating import DailyResult, RatingHistory, UserRating
 from src.models.social import (
@@ -38,6 +39,7 @@ __all__ = [
     "FriendRequestStatus",
     "GuestSession",
     "NotificationPreference",
+    "PushToken",
     "Puzzle",
     "PuzzleStatus",
     "RankedAttempt",
