@@ -308,6 +308,22 @@ export const sdk = {
     return api.get<StreakDTO>('/me/streak', { headers: headersFor(ctx) });
   },
 
+  async registerPushToken(
+    payload: { token: string; platform: PushPlatform },
+    ctx: AuthContext,
+  ): Promise<PushTokenDTO> {
+    return api.post<PushTokenDTO>('/me/push-tokens', payload, {
+      headers: headersFor(ctx),
+    });
+  },
+
+  async unregisterPushToken(token: string, ctx: AuthContext): Promise<void> {
+    return api.delete<void>(
+      `/me/push-tokens?token=${encodeURIComponent(token)}`,
+      { headers: headersFor(ctx) },
+    );
+  },
+
   async getNotificationPreferences(
     ctx: AuthContext,
   ): Promise<NotificationPreferencesDTO> {
@@ -509,6 +525,13 @@ export interface NotificationPreferencesDTO {
   readonly friend_challenged_you: boolean;
   readonly beat_your_time: boolean;
   readonly final_ranking_ready: boolean;
+}
+
+export type PushPlatform = 'ios' | 'android' | 'web';
+
+export interface PushTokenDTO {
+  readonly token: string;
+  readonly platform: string;
 }
 
 // ---- Epic 6 DTOs ----

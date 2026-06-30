@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     POSTHOG_API_KEY: str | None = None
     POSTHOG_HOST: str | None = None
     EXPO_ACCESS_TOKEN: str | None = None
+    # Master switch for push delivery. Off by default so the dispatcher is
+    # a safe no-op until APNs/FCM credentials + an Expo project are wired.
+    EXPO_PUSH_ENABLED: bool = False
 
     # Comma-separated list of browser origins allowed by CORS in non-dev
     # environments (e.g. the admin dashboard). Native mobile clients are
@@ -55,6 +58,12 @@ class Settings(BaseSettings):
     @property
     def is_development(self) -> bool:
         return self.ENVIRONMENT == "development"
+
+    @property
+    def push_enabled(self) -> bool:
+        """Whether push delivery should hit Expo's push service."""
+
+        return self.EXPO_PUSH_ENABLED
 
     @property
     def cors_allowed_origins(self) -> list[str]:

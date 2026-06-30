@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -262,6 +263,16 @@ class UpdateNotificationPreferencesRequest(BaseModel):
     friend_challenged_you: bool | None = None
     beat_your_time: bool | None = None
     final_ranking_ready: bool | None = None
+
+
+class RegisterPushTokenRequest(BaseModel):
+    token: str = Field(min_length=1, max_length=256)
+    platform: Literal["ios", "android", "web"] = "ios"
+
+
+class PushTokenPublic(APIModel):
+    token: str
+    platform: str
 
 
 # ---- Epic 7 — Archive / practice ----------------------------------------
