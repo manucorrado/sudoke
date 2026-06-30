@@ -244,7 +244,7 @@ Production/staging CORS is now env-backed. Before any Expo Web or admin browser 
 | API (uvicorn) | 8000 local / **10000** Render default | Set `PORT=10000` or read `$PORT` in start command |
 | Admin (Next.js) | 3001 local / **10000** Render | `next start -p $PORT` |
 
-**Gap:** API Dockerfile exposes 8000 and does not read `$PORT` — must fix for Render.
+**Resolved:** API Dockerfile reads `$PORT` (`CMD … --port ${PORT:-8000}`); Render injects `PORT=10000` and live `sudoke-api-staging` `/api/v1/health/ready` returns `200`. Admin runs via its own Docker image on port 10000.
 
 ---
 
