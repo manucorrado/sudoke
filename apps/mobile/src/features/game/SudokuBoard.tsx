@@ -3,11 +3,9 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   ALL_VALUES,
   boxOf,
-  colOf,
   findConflicts,
   GRID_SIZE,
   highlightPeers,
-  rowOf,
   TOTAL_CELLS,
   type CellState,
   type CellValue,
@@ -64,36 +62,39 @@ export function SudokuBoard({
   return (
     <View style={styles.boardWrap} accessibilityLabel="Sudoku board">
       <View style={styles.board}>
-        {grid.map((cell, index) => {
-          const row = rowOf(index);
-          const col = colOf(index);
-          const box = boxOf(index);
-          const isSelected = selectedIndex === index;
-          const isPeer = peerSet.has(index);
-          const isSameValue =
-            selectedValue !== null && cell.value === selectedValue && !cell.isWrong;
-          const isConflict = conflictSet.has(index);
-          const selectedCell =
-            selectedIndex !== null ? (grid[selectedIndex] ?? null) : null;
-          const sameBoxAsSelected =
-            selectedCell !== null && boxOf(selectedIndex!) === box;
-          return (
-            <CellView
-              key={index}
-              index={index}
-              cell={cell}
-              row={row}
-              col={col}
-              isSelected={isSelected}
-              isPeer={isPeer}
-              isSameValue={isSameValue}
-              isConflict={isConflict}
-              sameBoxAsSelected={sameBoxAsSelected}
-              onPress={onSelectCell}
-              disabled={disabled}
-            />
-          );
-        })}
+        {Array.from({ length: GRID_SIZE }, (_, row) => (
+          <View key={row} style={styles.row}>
+            {grid.slice(row * GRID_SIZE, row * GRID_SIZE + GRID_SIZE).map((cell, col) => {
+              const index = row * GRID_SIZE + col;
+              const box = boxOf(index);
+              const isSelected = selectedIndex === index;
+              const isPeer = peerSet.has(index);
+              const isSameValue =
+                selectedValue !== null && cell.value === selectedValue && !cell.isWrong;
+              const isConflict = conflictSet.has(index);
+              const selectedCell =
+                selectedIndex !== null ? (grid[selectedIndex] ?? null) : null;
+              const sameBoxAsSelected =
+                selectedCell !== null && boxOf(selectedIndex!) === box;
+              return (
+                <CellView
+                  key={index}
+                  index={index}
+                  cell={cell}
+                  row={row}
+                  col={col}
+                  isSelected={isSelected}
+                  isPeer={isPeer}
+                  isSameValue={isSameValue}
+                  isConflict={isConflict}
+                  sameBoxAsSelected={sameBoxAsSelected}
+                  onPress={onSelectCell}
+                  disabled={disabled}
+                />
+              );
+            })}
+          </View>
+        ))}
       </View>
     </View>
   );
@@ -215,17 +216,20 @@ const styles = StyleSheet.create({
   board: {
     width: BOARD_SIZE,
     height: BOARD_SIZE,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     borderWidth: 2,
     borderColor: colors.borderStrong,
     borderRadius: radius.sm,
     backgroundColor: colors.bg,
     overflow: 'hidden',
   },
-  cell: {
-    width: CELL_SIZE,
+  row: {
+    flexDirection: 'row',
+    width: '100%',
     height: CELL_SIZE,
+  },
+  cell: {
+    flex: 1,
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
     borderRightWidth: StyleSheet.hairlineWidth,

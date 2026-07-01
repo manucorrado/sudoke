@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import {
   parseGridString,
-  solve,
+  serializeGrid,
+  validatePuzzle,
   type Puzzle,
   type PuzzleDifficulty,
 } from '@sudoke/sudoku-core';
@@ -64,14 +65,19 @@ export function useArchiveMyResult(dailyPuzzleId: string | null) {
 export function puzzleFromArchive(detail: ArchiveDetailDTO): Puzzle {
   const difficulty = (detail.difficulty as PuzzleDifficulty) ?? 'medium';
   const givens = parseGridString(detail.givens);
-  const solution = solve(givens);
-  if (!solution) {
-    throw new Error(`Archive puzzle ${detail.puzzle_id} could not be solved`);
+  const validated = validatePuzzle({ givens });
+  if (!validated.ok) {
+    throw new Error(
+      `Archive puzzle ${detail.puzzle_id} failed validation: ${validated.issues.join('; ')}`,
+    );
+  }
+  if (serializeGrid(validated.solution) !== serializeGrid(parseGridString(detail.solution))) {
+    throw new Error(`Archive puzzle ${detail.puzzle_id} solution does not match givens`);
   }
   return {
     id: detail.puzzle_id,
     givens,
-    solution,
+    solution: validated.solution,
     metadata: {
       difficulty,
       estimatedSolveTimeSeconds: {

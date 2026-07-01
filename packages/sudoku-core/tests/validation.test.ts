@@ -12,6 +12,17 @@ const EASY =
   '000419005' +
   '000080079';
 
+const SCREENSHOT_INVALID =
+  '530070000' +
+  '060019500' +
+  '000980000' +
+  '060800006' +
+  '000340008' +
+  '030017000' +
+  '020006060' +
+  '000028000' +
+  '004190005';
+
 describe('validatePuzzle', () => {
   it('approves a valid unique-solution puzzle', () => {
     const result = validatePuzzle({ givens: parseGridString(EASY) });
@@ -31,6 +42,19 @@ describe('validatePuzzle', () => {
       givens: parseGridString('55' + '0'.repeat(79)),
     });
     expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues.join(' ')).toMatch(/given conflict/i);
+    }
+  });
+
+  it('rejects the screenshot invalid grid before app use', () => {
+    const result = validatePuzzle({
+      givens: parseGridString(SCREENSHOT_INVALID),
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues.join(' ')).toMatch(/given conflict/i);
+    }
   });
 
   it('cross-checks a provided solution', () => {
